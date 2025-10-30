@@ -169,6 +169,9 @@ let sessionToken = null;
 // Helper function to check if user is scrolled near bottom
 function isScrolledToBottom() {
   const threshold = 100; // pixels from bottom
+  const scrollableHeight = chatContainer.scrollHeight - chatContainer.clientHeight;
+  // If content doesn't scroll (fits in viewport), always return true
+  if (scrollableHeight <= 0) return true;
   return chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < threshold;
 }
 
