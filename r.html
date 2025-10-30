@@ -283,14 +283,7 @@ let typingDots = 0;
 let lastMessageCount = 0;
 let lastProcessedMessages = [];
 
-// Helper function to check if user is scrolled near bottom
-function isScrolledToBottom() {
-  const threshold = 100; // pixels from bottom
-  const scrollableHeight = chatContainer.scrollHeight - chatContainer.clientHeight;
-  // If content doesn't scroll (fits in viewport), always return true
-  if (scrollableHeight <= 0) return true;
-  return chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < threshold;
-}
+
 
 // Emoji picker toggle
 emojiBtn.addEventListener("click", (e) => {
@@ -461,9 +454,7 @@ async function loadTyping() {
     typingMsg.textContent = `Typing${dots}`;
     chatContainer.appendChild(typingMsg);
     // Only auto-scroll if user is already near the bottom
-    if (isScrolledToBottom()) {
-      chatContainer.scrollTop = chatContainer.scrollHeight;
-    }
+
   }
 }
 
