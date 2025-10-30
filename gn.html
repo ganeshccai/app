@@ -166,6 +166,12 @@ const fileInput = document.getElementById("file-input");
 let isLoggedIn = false;
 let sessionToken = null;
 
+// Helper function to check if user is scrolled near bottom
+function isScrolledToBottom() {
+  const threshold = 100; // pixels from bottom
+  return chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < threshold;
+}
+
 async function checkPwd() {
   const pwd = document.getElementById("pwd").value;
   const res = await fetch(`${BACKEND_URL}/login`, {
@@ -262,7 +268,10 @@ async function loadMessages() {
     chatContainer.appendChild(d);
   });
 
-  chatContainer.scrollTop = chatContainer.scrollHeight;
+  // Only auto-scroll if user is already near the bottom
+  if (isScrolledToBottom()) {
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
 }
 
 async function loadTyping() {
@@ -279,7 +288,10 @@ async function loadTyping() {
     typingMsg.className = "message user-msg";
     typingMsg.innerHTML = d.text.replace(/\n/g, "<br>");
     chatContainer.appendChild(typingMsg);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+    // Only auto-scroll if user is already near the bottom
+    if (isScrolledToBottom()) {
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
   }
 }
 
