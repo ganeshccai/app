@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+  <title>R</title>
+<style>
+  :root {
+    --accent: #feda75;
+    --accent2: #d62976;
+    --bg: linear-gradient(135deg, #feda75, #fa7e1e, #d62976, #962fbf, #4f5bd5);
+    --bubble-user: #ffcce0;
+    --bubble-agent: #ffffff;
+    --agent-border: #e0e0e0;
+  }
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    background-size: cover;
+    background-repeat: no-repeat;
+    color: #333;
+  }
+  header {
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    color: white;
+    padding: 14px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 20px;
+    position: relative;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  }
+  #agent-status {
+    position: absolute;
+    right: 14px;
+    top: 14px;
+    font-weight: bold;
+  }
+  #chat-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    background-color: #f8f8f8;
+    position: relative;
+  }
+  .message {
+    margin: 4px 0;
+    padding: 10px 14px;
+    border-radius: 14px;
+    max-width: 80%;
+    word-wrap: break-word;
+    font-size: 15px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  }
+  .user-msg {
+    background: var(--bubble-user);
+    align-self: flex-end;
+  }
+  .agent-msg {
+    background: var(--bubble-agent);
+    border: 1px solid var(--agent-border);
+    align-self: flex-start;
+  }
+  #input-container {
+    display: flex;
+    gap: 10px;
+    padding: 12px;
+    background: rgba(255,255,255,0.9);
+    border-top: 1px solid #ccc;
+    position: relative;
+  }
+  #msg {
+    flex: 1;
+    resize: none;
+    border-radius: 14px;
+    padding: 12px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+    outline: none;
+    max-height: 120px;
+  }
+  #msg:focus {
+    border-color: var(--accent2);
+  }
+  button {
+    padding: 12px 16px;
+    background: var(--accent2);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.3s ease;
+  }
+  button:hover {
+    background: #c2185b;
+  }
+  button:active {
+    opacity: 0.9;
+  }
+  #login-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(255,255,255,0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+  }
+  #login-box {
+    background: #fff;
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 0 12px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 280px;
+  }
+  #login-box input {
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    outline: none;
+  }
+
+  /* Emoji and Upload buttons container */
+  .extra-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+  }
+  
+  .extra-buttons button {
+    padding: 10px 14px;
+    font-size: 18px;
+  }
+
+  /* Emoji picker popup */
+  #emoji-picker {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: none;
+    max-width: 280px;
+    max-height: 240px;
+    overflow-y: auto;
+    margin-bottom: 8px;
+    z-index: 100;
+  }
+  
+  #emoji-picker.show {
+    display: block;
+  }
+  
+  .emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+  }
+  
+  .emoji-btn {
+    background: transparent;
+    border: none;
+    font-size: 24px;
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.2s;
+  }
+  
+  .emoji-btn:hover {
+    background: #f0f0f0;
+  }
+
+  /* 💖 Love Bubble Animation - Slow flight from bottom to middle */
+  .bubble {
+    position: fixed;
+    bottom: 80px;
+    font-size: 60px;
+    animation: floatUpSlow 3s linear forwards;
+    pointer-events: none;
+    z-index: 100;
+  }
+  @keyframes floatUpSlow {
+    0% {
+      transform: translateY(0) translateX(-50%);
+      opacity: 1;
+    }
+    90% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(calc(-50vh + 40px)) translateX(-50%);
+      opacity: 0;
+    }
+  }
+</style>
+</head>
+<body data-chat-id="1234">
+
+<div id="login-overlay">
+  <div id="login-box">
+    <input type="password" id="pwd" placeholder="Enter password" />
+    <button onclick="checkPwd()">Login 🔓</button>
+    <div id="login-msg" style="color:red;"></div>
+  </div>
+</div>
+
+<header>𝓡𝓮𝓰𝓪𝓵 <span id="agent-status">🔴</span></header>
+<div id="chat-container"></div>
+<div id="input-container">
+  <textarea id="msg" rows="2" placeholder="Type message..." autocomplete="off"></textarea>
+  <button id="send-btn">➤</button>
+  <button id="clear-btn">❌</button>
+  <div class="extra-buttons">
+    <button id="emoji-btn">😊</button>
+    <div id="emoji-picker">
+      <div class="emoji-grid">
+        <button class="emoji-btn" data-emoji="😊">😊</button>
+        <button class="emoji-btn" data-emoji="😂">😂</button>
+        <button class="emoji-btn" data-emoji="🤣">🤣</button>
+        <button class="emoji-btn" data-emoji="🥰">🥰</button>
+        <button class="emoji-btn" data-emoji="😀">😀</button>
+        <button class="emoji-btn" data-emoji="😢">😢</button>
+        <button class="emoji-btn" data-emoji="😁">😁</button>
+        <button class="emoji-btn" data-emoji="😍">😍</button>
+        <button class="emoji-btn" data-emoji="😎">😎</button>
+        <button class="emoji-btn" data-emoji="❤️">❤️</button>
+         <button class="emoji-btn" data-emoji="💖">💖</button>
+        <button class="emoji-btn" data-emoji="😭">😭</button>
+        <button class="emoji-btn" data-emoji="🤗">🤗</button>
+        <button class="emoji-btn" data-emoji="👍">👍</button>
+        <button class="emoji-btn" data-emoji="👋">👋</button>
+        <button class="emoji-btn" data-emoji="💯">💯</button>
+        <button class="emoji-btn" data-emoji="🙏">🙏</button>
+         <button class="emoji-btn" data-emoji="😴">😴</button>
+        <button class="emoji-btn" data-emoji="🔥">🔥</button>
+        <button class="emoji-btn" data-emoji="💕">💕</button>
+        <button class="emoji-btn" data-emoji="🎉">🎉</button>
+        <button class="emoji-btn" data-emoji="🌹">🌹</button>
+      </div>
+    </div>
+    <input type="file" id="file-input" accept="image/*" style="display:none" />
+    <button id="upload-btn">📎</button>
+  </div>
+</div>
+<script>
+const BACKEND_URL = "https://chatbot-788207962975.us-central1.run.app";
+const chatId = document.body.dataset.chatId || "1234";
+
+const msgInput = document.getElementById("msg");
+const sendBtn = document.getElementById("send-btn");
+const clearBtn = document.getElementById("clear-btn");
+const chatContainer = document.getElementById("chat-container");
+const agentStatus = document.getElementById("agent-status");
+const uploadBtn = document.getElementById("upload-btn");
+const fileInput = document.getElementById("file-input");
+const emojiBtn = document.getElementById("emoji-btn");
+const emojiPicker = document.getElementById("emoji-picker");
+
+let isLoggedIn = false;
+let sessionToken = null;
+let typingDots = 0;
+let lastMessageCount = 0;
+let lastProcessedMessages = [];
+
+// Emoji picker toggle
+emojiBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  emojiPicker.classList.toggle("show");
+});
+
+// Close emoji picker when clicking outside
+document.addEventListener("click", (e) => {
+  if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
+    emojiPicker.classList.remove("show");
+  }
+});
+
+// Insert emoji into message
+document.querySelectorAll(".emoji-btn").forEach(btn => {
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const emoji = btn.dataset.emoji;
+    const cursorPos = msgInput.selectionStart;
+    const textBefore = msgInput.value.substring(0, cursorPos);
+    const textAfter = msgInput.value.substring(cursorPos);
+    msgInput.value = textBefore + emoji + textAfter;
+    msgInput.focus();
+    msgInput.selectionStart = msgInput.selectionEnd = cursorPos + emoji.length;
+    emojiPicker.classList.remove("show");
+    sendTyping(msgInput.value);
+  });
+});
+
+async function checkPwd() {
+  const pwd = document.getElementById("pwd").value;
+  const res = await fetch(`${BACKEND_URL}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, password: pwd, sender: "user" })
+  });
+
+  const data = await res.json();
+  if (data.success) {
+    sessionToken = data.session_token;
+    document.getElementById("login-overlay").style.display = "none";
+    isLoggedIn = true;
+    startPolling();
+  } else {
+    document.getElementById("login-msg").textContent = data.error || "Login failed";
+  }
+}
+
+function startPolling() {
+  markOnline();
+  checkStatus();
+  loadMessages();
+  loadTyping();
+  setInterval(loadMessages, 1000);
+  setInterval(checkStatus, 1000);
+  setInterval(loadTyping, 500);
+  setInterval(() => {
+    if (document.visibilityState === "visible") markOnline();
+  }, 2000);
+}
+
+async function sendMessage() {
+  const text = msgInput.value.trim();
+  if (!text || !isLoggedIn || !sessionToken) return;
+
+  await fetch(`${BACKEND_URL}/send`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify({ chat_id: chatId, sender: "user", text })
+  });
+
+  msgInput.value = "";
+  await sendTyping("");
+  loadMessages();
+}
+
+async function loadMessages() {
+  if (!isLoggedIn) return;
+  const isTabActive = document.visibilityState === "visible";
+  const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=user&active=${isTabActive}`);
+  const data = await res.json();
+  chatContainer.innerHTML = "";
+
+  const currentMessageIds = data.map((m, i) => `${m.sender}-${m.text}-${i}`);
+  const newMessages = data.filter((m, i) => {
+    const msgId = `${m.sender}-${m.text}-${i}`;
+    return !lastProcessedMessages.includes(msgId);
+  });
+
+  const newLoveMessage = newMessages.some(m => m.text && /\blove\b/i.test(m.text));
+  const newGoodnightMessage = newMessages.some(m => 
+    m.text && /\b(goodnight|gn|gnsd|gntc|gnsdtc)\b/i.test(m.text)
+  );
+  
+  if (newLoveMessage) {
+    spawnLoveBubbles();
+  }
+  
+  if (newGoodnightMessage) {
+    spawnSleepBubbles();
+  }
+
+  lastProcessedMessages = currentMessageIds;
+
+  data.forEach((m, i) => {
+    const d = document.createElement("div");
+    d.className = "message " + (m.sender === "user" ? "user-msg" : "agent-msg");
+
+    if (m.type === "image" && m.url) {
+      const img = document.createElement("img");
+      img.src = m.url;
+      img.style.maxWidth = "240px";
+      img.style.borderRadius = "12px";
+      img.style.display = "block";
+      img.style.marginBottom = "6px";
+
+      const download = document.createElement("a");
+      download.href = m.url;
+      download.download = "image.jpg";
+      download.textContent = "⬇️";
+      download.style.fontSize = "14px";
+      download.style.textDecoration = "none";
+      download.style.color = "#555";
+
+      d.appendChild(img);
+      d.appendChild(download);
+    } else {
+      d.innerHTML = (m.text || "").replace(/\n/g, "<br>");
+    }
+
+    const isLast = i === data.length - 1;
+    if (m.sender === "user" && m.seen_by === "agent" && isLast) {
+      const seenTag = document.createElement("div");
+      seenTag.style.fontSize = "12px";
+      seenTag.style.color = "#888";
+      seenTag.style.marginTop = "4px";
+      seenTag.textContent = "✅";
+      d.appendChild(seenTag);
+    }
+
+    chatContainer.appendChild(d);
+  });
+
+  if (data.length > lastMessageCount) {
+    lastMessageCount = data.length;
+  }
+
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+async function loadTyping() {
+  if (!isLoggedIn) return;
+  const res = await fetch(`${BACKEND_URL}/get_live_typing/${chatId}`);
+  const d = await res.json();
+
+  const oldTyping = document.getElementById("agent-typing-indicator");
+  if (oldTyping) oldTyping.remove();
+
+  if (d.sender === "agent" && d.text) {
+    typingDots = (typingDots + 1) % 4;
+    const dots = ".".repeat(typingDots);
+    const typingMsg = document.createElement("div");
+    typingMsg.id = "agent-typing-indicator";
+    typingMsg.className = "message agent-msg";
+    typingMsg.textContent = `Typing${dots}`;
+    chatContainer.appendChild(typingMsg);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
+}
+
+async function sendTyping(text) {
+  if (!isLoggedIn) return;
+  await fetch(`${BACKEND_URL}/live_typing`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify({ chat_id: chatId, sender: "user", text })
+  });
+}
+
+async function checkStatus() {
+  if (!isLoggedIn) return;
+  const res = await fetch(`${BACKEND_URL}/is_online/${chatId}?t=${Date.now()}`);
+  const d = await res.json();
+  const emoji = d.agent_online ? "🟢" : "🔴";
+  const time = d.agent_online ? "" : ` ${d.agent_last_seen}`;
+  agentStatus.textContent = `${emoji}${time}`;
+}
+
+async function clearChat() {
+  if (!isLoggedIn) return;
+  await fetch(`${BACKEND_URL}/clear_chat/${chatId}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify({ sender: "user" })
+  });
+  chatContainer.innerHTML = "";
+  lastMessageCount = 0;
+  lastProcessedMessages = [];
+}
+
+async function markOnline() {
+  if (!isLoggedIn) return;
+  await fetch(`${BACKEND_URL}/mark_online`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify({ chat_id: chatId, sender: "user" })
+  });
+}
+
+uploadBtn.addEventListener("click", () => fileInput.click());
+
+fileInput.addEventListener("change", async () => {
+  const file = fileInput.files[0];
+  if (!file || !isLoggedIn || !sessionToken) return;
+
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const base64 = reader.result;
+    await fetch(`${BACKEND_URL}/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${sessionToken}`
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        sender: "user",
+        type: "image",
+        url: base64
+      })
+    });
+    loadMessages();
+  };
+  reader.readAsDataURL(file);
+});
+
+sendBtn.addEventListener("mousedown", e => e.preventDefault());
+sendBtn.addEventListener("click", sendMessage);
+clearBtn.addEventListener("click", clearChat);
+msgInput.addEventListener("input", e => sendTyping(e.target.value));
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    markOnline();
+    loadMessages();
+  }
+});
+
+window.addEventListener("beforeunload", () => {
+  try {
+    const data = JSON.stringify({ chat_id: chatId, sender: "user" });
+    const blob = new Blob([data], { type: "application/json" });
+    navigator.sendBeacon(`${BACKEND_URL}/logout_user`, blob);
+  } catch (e) {
+    console.warn("Logout beacon failed:", e);
+  }
+});
+
+function spawnLoveBubbles() {
+  for (let i = 0; i < 5; i++) {
+    setTimeout(() => {
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = "💖";
+      bubble.style.left = `${20 + Math.random() * 60}%`;
+      document.body.appendChild(bubble);
+      setTimeout(() => bubble.remove(), 3000);
+    }, i * 200);
+  }
+}
+
+function spawnSleepBubbles() {
+  for (let i = 0; i < 5; i++) {
+    setTimeout(() => {
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = "😴";
+      bubble.style.left = `${20 + Math.random() * 60}%`;
+      document.body.appendChild(bubble);
+      setTimeout(() => bubble.remove(), 3000);
+    }, i * 200);
+  }
+}
+
+navigator.serviceWorker?.register("sw.js");
+</script>
+</body>
+</html>
+
+
