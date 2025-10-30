@@ -442,11 +442,7 @@ async function loadMessages() {
     lastMessageCount = data.length;
   }
 
-  // Only auto-scroll if user is already near the bottom
-  if (isScrolledToBottom()) {
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-  }
-}
+
 
 async function loadTyping() {
   if (!isLoggedIn) return;
