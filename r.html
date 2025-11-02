@@ -469,20 +469,17 @@ document.querySelectorAll(".emoji-btn").forEach(btn => {
 });
 
 async function checkPwd() {
-  console.log('Starting login process...');
   // --- Check lock before logging in ---
   try {
     const lockData = JSON.parse(localStorage.getItem(LOCK_KEY));
     const isStale = !lockData || (Date.now() - lockData.timestamp) > LOCK_TIMEOUT_MS;
 
-    if (lockData && !isStale) {
+    if (lockData && !isStale && lockData.id !== thisTabId) {
       // Another tab is active. Show error.
       document.getElementById("login-msg").textContent = "Session is active in another tab.";
       return; // Stop login
     }
-  } catch(e) { 
-    console.warn('Lock check error:', e);
-  }
+  } catch(e) { /* continue */ }
   // --- End Check ---
 
   const pwd = document.getElementById("pwd").value;
@@ -931,36 +928,42 @@ async function loadMessages() {
       options.appendChild(delBtn);
     }
 
-    // 3) Emoji / React with inline picker
-    const reactBtn = document.createElement('button'); reactBtn.className = 'option-btn'; reactBtn.title = 'Add Reaction'; reactBtn.textContent = '😊';
-    
-    // Track if picker is open
-    let isPickerOpen = false;
-    
+    // 3) Emoji / React
+    const reactBtn = document.createElement('button');
+    reactBtn.className = 'option-btn';
+    reactBtn.title = 'React';
+    reactBtn.textContent = '😊';
     reactBtn.addEventListener('click', (ev) => {
       ev.stopPropagation();
+      const picker = emojiPicker.cloneNode(true);
+      picker.id = '';
+      picker.style.display = 'block';
+      picker.style.position = 'absolute';
+      picker.style.zIndex = '1000';
+      picker.style.left = '0';
+      picker.style.bottom = '100%';
       
-      // Toggle picker state
-      isPickerOpen = !isPickerOpen;
+      // Position the picker above the message
+      options.appendChild(picker);
       
-      // Remove any existing pickers
-      document.querySelectorAll('.inline-reactions').forEach(el => el.remove());
+      // Handle emoji selection
+      picker.querySelectorAll('.emoji-btn').forEach(b => {
+        b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          addReaction(m.id, b.dataset.emoji);
+          picker.remove();
+          options.classList.remove('show');
+        });
+      });
       
-      if (!isPickerOpen) return;
-      
-      // Create inline emoji picker
-      const inlineReactions = document.createElement('div');
-      inlineReactions.className = 'inline-reactions';
-      inlineReactions.style.display = 'flex';
-      inlineReactions.style.flexWrap = 'wrap';
-      inlineReactions.style.gap = '4px';
-      inlineReactions.style.padding = '8px';
-      inlineReactions.style.background = '#fff';
-      inlineReactions.style.borderRadius = '12px';
-      inlineReactions.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-      inlineReactions.style.marginTop = '8px';
-      inlineReactions.style.position = 'absolute';
-      inlineReactions.style.zIndex = '100';
+      // Close picker when clicking outside
+      const closeHandler = (e) => {
+        if (!picker.contains(e.target) && e.target !== reactBtn) {
+          picker.remove();
+          document.removeEventListener('click', closeHandler);
+        }
+      };
+      document.addEventListener('click', closeHandler);
       
       // Quick reaction emojis
       const quickEmojis = ['👍', '❤️', '😊', '😂', '😍', '🎉', '👏', '🔥'];
@@ -1338,9 +1341,14 @@ document.addEventListener("visibilitychange", () => {
 
 window.addEventListener("beforeunload", () => {
   // --- Release lock if this tab is the active one ---
-  if (isThisTabActive) {
-    // This is a synchronous operation, it's safe here
-    localStorage.removeItem(LOCK_KEY);
+  if (isThisTabActive && isLoggedIn) {
+    try {
+      const currentLock = JSON.parse(localStorage.getItem(LOCK_KEY));
+      // Only remove if this tab owns the lock
+      if (currentLock && currentLock.id === thisTabId) {
+        localStorage.removeItem(LOCK_KEY);
+      }
+    } catch(e) { /* ignore cleanup errors */ }
   }
   // --- End Release ---
 
