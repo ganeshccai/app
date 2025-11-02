@@ -428,6 +428,7 @@ let sessionToken = null;
 let typingDots = 0;
 let lastMessageCount = 0;
 let lastProcessedMessages = [];
+let replyingTo = null; // Track which message we're replying to
 
 // Track whether user manually scrolled up; if true, avoid auto-scroll
 let userScrolledUp = false;
@@ -563,18 +564,43 @@ async function sendMessage() {
   const text = msgInput.value.trim();
   if (!text || !isLoggedIn || !sessionToken || !isThisTabActive) return;
 
-  await fetch(`${BACKEND_URL}/send`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
-    },
-    body: JSON.stringify({ chat_id: chatId, sender: "user", text })
-  });
+  // Include replyingTo in the message data if it exists
+  const messageData = {
+    chat_id: chatId,
+    sender: "user",
+    text
+  };
+  
+  // Add reply_to if we're replying to a message
+  if (typeof replyingTo !== 'undefined' && replyingTo !== null) {
+    messageData.reply_to = replyingTo;
+    // Clear reply indicator
+    const replyIndicator = document.getElementById('reply-indicator');
+    if (replyIndicator) replyIndicator.remove();
+    replyingTo = null;
+  }
 
-  msgInput.value = "";
-  await sendTyping("");
-  loadMessages();
+  try {
+    const response = await fetch(`${BACKEND_URL}/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${sessionToken}`
+      },
+      body: JSON.stringify(messageData)
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to send message');
+    }
+
+    msgInput.value = "";
+    await sendTyping("");
+    loadMessages();
+  } catch (error) {
+    console.error('Error sending message:', error);
+    alert('Failed to send message. Please try again.');
+  }
 }
 
 async function loadMessages() {
