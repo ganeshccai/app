@@ -80,74 +80,6 @@
     background-color: #f8f8f8;
     position: relative;
   }
-  .message {
-    margin: 4px 0;
-    padding: 10px 14px;
-    border-radius: 14px;
-    max-width: 80%;
-    word-wrap: break-word;
-    font-size: 15px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
-  }
-  .user-msg {
-    background: var(--bubble-user);
-    align-self: flex-end;
-  }
-  .agent-msg {
-    background: var(--bubble-agent);
-    border: 1px solid var(--agent-border);
-    align-self: flex-start;
-  }
-  #input-container {
-    display: flex;
-    gap: 10px;
-    padding: 12px;
-    background: rgba(255,255,255,0.9);
-    border-top: 1px solid #ccc;
-    position: relative;
-    min-width:50px;
-    max-height:100px;
-  }
-  #msg {
-    flex: 1;
-    resize: none;
-    border-radius: 14px;
-    padding: 12px;
-    border: 1px solid #ccc;
-    font-size: 16px;
-    outline: none;
-    max-height: 100px;
-    min-width:150px
-  }
-  #msg:focus {
-    border-color: var(--accent2);
-  }
-  button {
-    padding: 12px 16px;
-    background: #FFB6C1;
-    color: white;
-    border: none;
-    border-radius: 14px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background 0.3s ease;
-  }
-  button:hover {
-    background: #c2185b;
-  }
-  button:active {
-    opacity: 0.9;
-  }
-  
-  #login-overlay {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(255,255,255,0.95);
-    display: none; /* Hidden by default */
-    justify-content: center;
-    align-items: center;
-    z-index: 999;
-  }
   
   #login-box {
     background: #fff;
@@ -245,6 +177,24 @@
       opacity: 0;
     }
   }
+
+  /* Message options popup */
+  .options-popup {
+    position: absolute;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.08);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    border-radius: 8px;
+    padding: 6px;
+    z-index: 1200;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .options-popup button { background: transparent; border: none; cursor: pointer; padding:6px; border-radius:6px }
+  .reply-indicator { padding:8px; background:#f0f0f0; border-radius:8px; margin-bottom:8px; display:flex; gap:8px; align-items:center }
+  .reactions { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap }
+  .reaction { background:#f0f0f0; padding:3px 8px; border-radius:12px; font-size:14px; display:inline-flex; align-items:center; gap:6px; cursor:pointer }
 </style>
 </head>
 <body data-chat-id="1234">
@@ -270,7 +220,7 @@
     </p>
     </div>
 </div>
-<header style="position:relative">𝓡𝓮𝓰𝓪𝓵 <span id="agent-status">🔴</span>
+<header>𝓡𝓮𝓰𝓪𝓵 <span id="agent-status">🔴</span>
   <span id="unread-badge" style="display:none; position:absolute; left:14px; top:14px; background:#ff3b30; color:#fff; padding:4px 8px; border-radius:12px; font-size:12px; cursor:pointer; z-index:50">0</span>
 </header>
 <div id="chat-container"></div>
@@ -317,881 +267,567 @@
     
 </div>
 <script>
-// Chat session management  
+// --- *** START: localStorage TAB LOCK *** ---
+const LOCK_KEY = 'regal_chat_session_lock';
+const LOCK_TIMEOUT_MS = 5000; // 5 seconds
+const thisTabId = Date.now().toString() + Math.random();
+let isThisTabActive = false; // Flag to track if this tab holds the lock
+let sessionCheckInterval = null; // Holds the interval timer
+
+// *** NEW: ADDED THIS FUNCTION ***
+/**
+ * Manually clears the lock from localStorage and reloads the page.
+ */
+function forceClearLock(e) {
+  if (e) e.preventDefault(); // Stop link from navigating
+  console.warn('Forcing lock release...');
+  localStorage.removeItem(LOCK_KEY);
+  window.location.reload();
+}
+// *** END NEW FUNCTION ***
+
+function showLockScreen() {
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('lock-overlay').style.display = 'flex';
+  isThisTabActive = false;
+  isLoggedIn = false;
+  // Stop all polling timers if they exist
+  if (sessionCheckInterval) clearInterval(sessionCheckInterval);
+}
+
 function showLoginScreen() {
+  document.getElementById('lock-overlay').style.display = 'none';
   document.getElementById('login-overlay').style.display = 'flex';
 }
 
+/**
+ * Checks the lock status in localStorage.
+ * This runs when the page first loads.
+ */
 function checkSessionLock() {
-  showLoginScreen(); // Always show login screen initially
+  try {
+    const lockData = JSON.parse(localStorage.getItem(LOCK_KEY));
+    
+    if (!lockData) {
+      // No lock exists. Show the login screen.
+      showLoginScreen();
+      return;
+    }
+
+    const isStale = (Date.now() - lockData.timestamp) > LOCK_TIMEOUT_MS;
+    
+    if (isStale) {
+      // Lock is old or "stale". This tab can take it.
+      console.warn('Found stale lock, clearing it.');
+      localStorage.removeItem(LOCK_KEY);
+      showLoginScreen();
+    } else {
+      // Lock is fresh and held by another tab.
+      console.log('Session is active elsewhere. Locking this tab.');
+      showLockScreen();
+    }
+  } catch (e) {
+    // Error parsing, probably bad data. Clear it and login.
+    console.error('Error checking session lock, clearing.', e);
+    localStorage.removeItem(LOCK_KEY);
+    showLoginScreen();
+  }
 }
+
+/**
+ * Listens for changes in other tabs.
+ */
+window.addEventListener('storage', (e) => {
+  if (e.key === LOCK_KEY) {
+    if (e.newValue === null) {
+      // The lock was released by the active tab.
+      console.log('Session lock released by another tab. Reloading to enable login.');
+      window.location.reload();
+    } else {
+      // Another tab just took or refreshed the lock.
+      // If it wasn't this tab, lock this one.
+      try {
+        const lockData = JSON.parse(e.newValue);
+        if (lockData && lockData.id !== thisTabId) {
+          console.log('Session taken by another tab. Locking this one.');
+          showLockScreen();
+        }
+      } catch (e) { /* ignore parse error */ }
+    }
+  }
+});
+// --- *** END: localStorage TAB LOCK *** ---
 
 
 const BACKEND_URL = "https://app-788207962975.us-central1.run.app";
 const chatId = document.body.dataset.chatId || "1234";
 
-// Store all DOM elements in one place
-const elements = {
-  msgInput: document.getElementById("msg"),
-  sendBtn: document.getElementById("send-btn"),
-  clearBtn: document.getElementById("clear-btn"),
-  chatContainer: document.getElementById("chat-container"),
-  agentStatus: document.getElementById("agent-status"),
-  uploadBtn: document.getElementById("upload-btn"),
-  fileInput: document.getElementById("file-input"),
-  emojiBtn: document.getElementById("emoji-btn"),
-  emojiPicker: document.getElementById("emoji-picker"),
-  unreadBadge: document.getElementById('unread-badge'),
-  loginOverlay: document.getElementById('login-overlay')
-};
+const msgInput = document.getElementById("msg");
+const sendBtn = document.getElementById("send-btn");
+const clearBtn = document.getElementById("clear-btn");
+const chatContainer = document.getElementById("chat-container");
+const agentStatus = document.getElementById("agent-status");
+const uploadBtn = document.getElementById("upload-btn");
+const fileInput = document.getElementById("file-input");
+const emojiBtn = document.getElementById("emoji-btn");
+const emojiPicker = document.getElementById("emoji-picker");
+const unreadBadge = document.getElementById('unread-badge');
 
-// Global state variables
-const state = {
-  isLoggedIn: false,
-  sessionToken: null,
-  typingDots: 0,
-  lastMessageCount: 0,
-  lastProcessedMessages: [],
-  replyingTo: null,  // Track which message we're replying to
-};
+// Editing / replying state
+let editingMessageId = null;
+let replyingTo = null;
 
-// Scroll behavior management
-const scrollManager = {
-  userScrolledUp: false,
-  
-  init() {
-    elements.chatContainer.addEventListener('scroll', () => {
-      const nearBottom = this.isNearBottom();
-      this.userScrolledUp = !nearBottom;
-    });
-  },
+// For logged-out unread polling
+const UNREAD_KEY = 'regal_last_seen_ts';
+let unreadPollInterval = null;
 
-  isNearBottom() {
-    const container = elements.chatContainer;
-    return container.scrollTop + container.clientHeight >= container.scrollHeight - 60;
-  },
-  
-  scrollToBottomIfNeeded() {
-    if (!this.userScrolledUp) {
-      elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
-    }
-  }
-};
+let isLoggedIn = false;
+let sessionToken = null;
+let typingDots = 0;
+let lastMessageCount = 0;
+let lastProcessedMessages = [];
 
 // Emoji picker toggle
-elements.emojiBtn.addEventListener("click", (e) => {
+emojiBtn.addEventListener("click", (e) => {
   e.stopPropagation();
-  elements.emojiPicker.classList.toggle("show");
+  emojiPicker.classList.toggle("show");
 });
 
 // Close emoji picker when clicking outside
 document.addEventListener("click", (e) => {
-  if (!elements.emojiPicker.contains(e.target) && e.target !== elements.emojiBtn) {
-    elements.emojiPicker.classList.remove("show");
+  if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
+    emojiPicker.classList.remove("show");
   }
+  // Close any message options popup when clicking outside
+  document.querySelectorAll('.options-popup').forEach(p => {
+    if (!p.contains(e.target)) p.remove();
+  });
 });
 
-// Insert emoji into message (picker buttons)
+// Insert emoji into message
 document.querySelectorAll(".emoji-btn").forEach(btn => {
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
     const emoji = btn.dataset.emoji;
-    const cursorPos = elements.msgInput.selectionStart;
-    const textBefore = elements.msgInput.value.substring(0, cursorPos);
-    const textAfter = elements.msgInput.value.substring(cursorPos);
-    elements.msgInput.value = textBefore + emoji + textAfter;
-    elements.msgInput.focus();
-    elements.msgInput.selectionStart = elements.msgInput.selectionEnd = cursorPos + emoji.length;
-    elements.emojiPicker.classList.remove("show");
-    sendTyping(elements.msgInput.value);
+    const cursorPos = msgInput.selectionStart;
+    const textBefore = msgInput.value.substring(0, cursorPos);
+    const textAfter = msgInput.value.substring(cursorPos);
+    msgInput.value = textBefore + emoji + textAfter;
+    msgInput.focus();
+    msgInput.selectionStart = msgInput.selectionEnd = cursorPos + emoji.length;
+    emojiPicker.classList.remove("show");
+    sendTyping(msgInput.value);
   });
 });
 
 async function checkPwd() {
-  const pwd = document.getElementById("pwd").value;
-  document.getElementById("login-msg").textContent = "";
-  
-  if (!pwd) {
-    document.getElementById("login-msg").textContent = "Please enter a password";
-    return;
-  }
-
+  // --- Check lock before logging in ---
   try {
-    const res = await fetch(`${BACKEND_URL}/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, password: pwd, sender: "user" })
-    });
-    
-    const data = await res.json();
-    
-    if (data.success && data.session_token) {
-      state.sessionToken = data.session_token;
-      if (elements.loginOverlay) elements.loginOverlay.style.display = "none";
-      state.isLoggedIn = true;
-      startPolling();
-      loadMessages();
-    } else {
-      throw new Error(data.error || "Login failed");
+    const lockData = JSON.parse(localStorage.getItem(LOCK_KEY));
+    const isStale = !lockData || (Date.now() - lockData.timestamp) > LOCK_TIMEOUT_MS;
+
+    if (lockData && !isStale) {
+      // Another tab is active. Show error.
+      document.getElementById("login-msg").textContent = "Session is active in another tab.";
+      return; // Stop login
     }
-  } catch (error) {
-    document.getElementById("login-msg").textContent = error.message || "Login failed. Please try again.";
+  } catch(e) { /* continue */ }
+  // --- End Check ---
+
+  const pwd = document.getElementById("pwd").value;
+  const res = await fetch(`${BACKEND_URL}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, password: pwd, sender: "user" })
+  });
+
+  const data = await res.json();
+  if (data.success) {
+    // --- Claim this tab as active ---
+    isThisTabActive = true; // This tab now holds the lock
+    const sessionData = { id: thisTabId, timestamp: Date.now() };
+    localStorage.setItem(LOCK_KEY, JSON.stringify(sessionData));
+    // --- End Claim ---
+
+    sessionToken = data.session_token;
+    document.getElementById("login-overlay").style.display = "none";
+    isLoggedIn = true;
+    startPolling();
+    // When logged in, clear public unread marker
+    try { localStorage.setItem(UNREAD_KEY, String(Math.floor(Date.now()/1000))); } catch(e){}
+  } else {
+    document.getElementById("login-msg").textContent = data.error || "Login failed";
+    // *** IMPORTANT: Make sure your backend also checks for concurrent logins!
+    // If the backend says "Session already active", show that error.
+    if (data.error === "Session is already active elsewhere.") {
+        showLockScreen();
+    }
   }
 }
 
-
 function startPolling() {
-  if (!state.isLoggedIn) return;
+  // --- Heartbeat to keep the lock alive ---
+  if (sessionCheckInterval) clearInterval(sessionCheckInterval);
+  
+  sessionCheckInterval = setInterval(() => {
+    if (isThisTabActive && isLoggedIn) {
+      // This tab is active, refresh its lock
+      try {
+        const sessionData = { id: thisTabId, timestamp: Date.now() };
+        localStorage.setItem(LOCK_KEY, JSON.stringify(sessionData));
+      } catch (e) {
+        console.error("Failed to write heartbeat, stopping.", e);
+        // This can happen if storage is full
+        isThisTabActive = false;
+        isLoggedIn = false;
+        clearInterval(sessionCheckInterval);
+        showLockScreen();
+      }
+    } else {
+      // This tab is no longer active, stop the heartbeat
+      clearInterval(sessionCheckInterval);
+    }
+  }, 2000); // Refresh lock every 2 seconds
+  // --- End Heartbeat ---
 
-  // Clear any existing interval we created earlier
-  if (window.__regalPollInterval) clearInterval(window.__regalPollInterval);
-
-  // Run immediate checks
   markOnline();
   checkStatus();
   loadMessages();
   loadTyping();
-
-  // Poll regularly while logged in
-  window.__regalPollInterval = setInterval(() => {
-    if (!state.isLoggedIn) return;
+  
+  // Consolidating your intervals
+  setInterval(() => {
+    if (!isLoggedIn || !isThisTabActive) return; // Stop polling if not active
     loadMessages();
     checkStatus();
+  }, 1000);
+
+  setInterval(() => {
+    if (!isLoggedIn || !isThisTabActive) return;
     loadTyping();
+  }, 500);
+  
+  setInterval(() => {
+    if (document.visibilityState === "visible" && isLoggedIn && isThisTabActive) {
+        markOnline();
+    }
   }, 2000);
+
+  // Stop public unread polling when logged in
+  if (unreadPollInterval) { clearInterval(unreadPollInterval); unreadPollInterval = null; }
 }
 
 async function sendMessage() {
-  const text = elements.msgInput.value.trim();
-  
-  // Basic validation
-  if (!text) return;
-  
-  if (!state.isLoggedIn || !state.sessionToken) {
-    showLoginScreen();
-    return;
-  }
-
-    // Handle message editing
-  const messageBeingEdited = state.messageBeingEdited;
-  if (messageBeingEdited) {
-    try {
-      const response = await fetch(`${BACKEND_URL}/edit_message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${state.sessionToken}`
-        },
-        body: JSON.stringify({
-          chat_id: chatId,
-          message_id: messageBeingEdited,
-          text: text,
-          user_id: 'user'
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to edit message');
-      }
-      
-      // Clear edit mode
-      state.messageBeingEdited = null;
-      const editIndicator = document.getElementById('edit-indicator');
-      if (editIndicator) editIndicator.remove();
-      
-      elements.msgInput.value = '';
-      loadMessages();
-      return;
-    } catch (error) {
-      console.error('Edit error:', error);
-      alert('Failed to edit message: ' + error.message);
-      return;
-    }
-  }
-
-    // Prepare message data
-  const messageData = {
-    chat_id: chatId,
-    sender: "user",
-    text
-  };
-  
-  // Add reply_to if replying to a message
-  if (state.replyingTo) {
-    messageData.reply_to = state.replyingTo;
-    const replyIndicator = document.getElementById('reply-indicator');
-    if (replyIndicator) replyIndicator.remove();
-    state.replyingTo = null;
-  }
+  const text = msgInput.value.trim();
+  if (!text && !editingMessageId) return;
+  if (!isLoggedIn || !sessionToken || !isThisTabActive) { showLoginScreen(); return; }
 
   try {
-    const response = await fetch(`${BACKEND_URL}/send`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${state.sessionToken}`
-      },
-      body: JSON.stringify(messageData)
+    if (editingMessageId) {
+      // Edit existing message
+      const r = await fetch(`${BACKEND_URL}/edit_message`, {
+        method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization': `Bearer ${sessionToken}` },
+        body: JSON.stringify({ chat_id: chatId, message_id: editingMessageId, text, user_id: 'user' })
+      });
+      if (!r.ok) throw new Error('Edit failed');
+      editingMessageId = null;
+      const ed = document.getElementById('edit-indicator'); if (ed) ed.remove();
+      msgInput.value = '';
+      await sendTyping('');
+      await loadMessages();
+      return;
+    }
+
+    // Normal send
+    const payload = { chat_id: chatId, sender: 'user', text };
+    if (replyingTo) payload.reply_to = replyingTo;
+
+    const res = await fetch(`${BACKEND_URL}/send`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+      body: JSON.stringify(payload)
     });
+    if (!res.ok) throw new Error('Failed to send');
 
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      throw new Error(responseData.error || 'Failed to send message');
-    }
-
-    elements.msgInput.value = "";
-    await sendTyping("");
-    loadMessages();
-  } catch (error) {
-    if (error.message.includes('expired')) {
-      state.isLoggedIn = false;
-      state.sessionToken = null;
-      showLoginScreen();
-    } else {
-      alert('Failed to send message: ' + error.message);
-    }
+    // Clear input & any reply indicator
+    msgInput.value = '';
+    if (replyingTo) { replyingTo = null; const ri = document.getElementById('reply-indicator'); if (ri) ri.remove(); }
+    await sendTyping('');
+    await loadMessages();
+  } catch (err) {
+    console.error('sendMessage error', err);
+    if (String(err).includes('expired')) { isLoggedIn = false; sessionToken = null; showLoginScreen(); }
+    else alert('Failed to send: ' + err.message);
   }
 }
 
-async function loadMessages() {
-  if (!state.isLoggedIn) return;
-  
-  const isTabActive = document.visibilityState === "visible";
-  
+// Show options popup for a clicked message
+function showMessageOptions(e, message, el) {
+  // remove existing
+  document.querySelectorAll('.options-popup').forEach(x=>x.remove());
+
+  const popup = document.createElement('div'); popup.className = 'options-popup';
+  const replyBtn = document.createElement('button'); replyBtn.textContent = '↩️ Reply';
+  replyBtn.onclick = (ev)=>{
+    ev.stopPropagation(); replyingTo = message.id;
+    // show reply indicator above input
+    document.querySelectorAll('#reply-indicator').forEach(x=>x.remove());
+    const ri = document.createElement('div'); ri.id='reply-indicator'; ri.className='reply-indicator';
+    ri.innerHTML = `<div style="flex:1"><div style="font-size:12px;color:#666;">↳ Replying to ${message.sender}</div><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px">${(message.text||'(image)')}</div></div>`;
+    const cancel = document.createElement('button'); cancel.textContent='❌'; cancel.onclick = ()=>{ replyingTo=null; ri.remove(); };
+    ri.appendChild(cancel);
+    document.getElementById('input-container').insertBefore(ri, msgInput);
+    popup.remove();
+  };
+  popup.appendChild(replyBtn);
+
+  const reactBtn = document.createElement('button'); reactBtn.textContent='😊 React';
+  reactBtn.onclick = (ev)=>{
+    ev.stopPropagation();
+    // quick inline reactions
+    const quick = ['👍','❤️','😊','😂','😍','🎉','👏','🔥'];
+    const container = document.createElement('div'); container.style.display='flex'; container.style.gap='6px';
+    quick.forEach(emoji=>{ const b=document.createElement('button'); b.textContent=emoji; b.onclick=(e2)=>{ e2.stopPropagation(); addReaction(message.id, emoji); popup.remove(); }; container.appendChild(b); });
+    popup.appendChild(container);
+  };
+  popup.appendChild(reactBtn);
+
+  if (message.sender === 'user') {
+    const editBtn = document.createElement('button'); editBtn.textContent='✏️ Edit';
+    editBtn.onclick = (ev)=>{ ev.stopPropagation(); editingMessageId = message.id; msgInput.value = message.text || ''; msgInput.focus();
+      // show edit indicator
+      document.querySelectorAll('#edit-indicator').forEach(x=>x.remove());
+      const ed = document.createElement('div'); ed.id='edit-indicator'; ed.className='reply-indicator'; ed.textContent='Editing message...';
+      const c = document.createElement('button'); c.textContent='❌'; c.onclick=()=>{ editingMessageId=null; ed.remove(); msgInput.value=''; };
+      ed.appendChild(c);
+      document.getElementById('input-container').insertBefore(ed, msgInput);
+      popup.remove(); };
+    popup.appendChild(editBtn);
+
+    const delBtn = document.createElement('button'); delBtn.textContent='🗑️ Delete';
+    delBtn.onclick = async (ev)=>{ ev.stopPropagation(); if (!confirm('Delete this message?')) return; await deleteMessage(message.id); popup.remove(); };
+    popup.appendChild(delBtn);
+  }
+
+  // position popup near element
+  document.body.appendChild(popup);
+  const rect = el.getBoundingClientRect();
+  popup.style.left = Math.max(8, rect.left) + 'px';
+  popup.style.top = (window.scrollY + rect.top - popup.offsetHeight - 8) + 'px';
+}
+
+async function addReaction(messageId, emoji) {
+  if (!isLoggedIn || !sessionToken) { showLoginScreen(); return; }
   try {
-    const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=user&active=${isTabActive}`, {
-      headers: {
-        'Authorization': `Bearer ${state.sessionToken}`
-      }
-    });
+    const r = await fetch(`${BACKEND_URL}/react`, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ chat_id: chatId, message_id: messageId, reaction: emoji, user_id: 'user' }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'React failed');
+    await loadMessages();
+  } catch (e) { console.error('addReaction', e); if (String(e).includes('expired')) { isLoggedIn=false; sessionToken=null; showLoginScreen(); } }
+}
 
-    if (!res.ok) {
-      throw new Error(`HTTP error! status: ${res.status}`);
-    }
+function updateUnreadBadge(count) {
+  try {
+    if (!unreadBadge) return;
+    if (count && count > 0) { unreadBadge.style.display='inline-block'; unreadBadge.textContent = count>99 ? '99+' : String(count); document.title = `(${count}) ${document.title.replace(/^\(\d+\)\s*/, '')}`; }
+    else { unreadBadge.style.display='none'; document.title = document.title.replace(/^\(\d+\)\s*/, ''); }
+  } catch(e){}
+}
 
-    const data = await res.json();
+function startPublicUnreadPoll() {
+  if (unreadPollInterval) return;
+  unreadPollInterval = setInterval(async ()=>{
+    if (isLoggedIn) { clearInterval(unreadPollInterval); unreadPollInterval=null; return; }
+    try {
+      const r = await fetch(`${BACKEND_URL}/messages/${chatId}`);
+      if (!r.ok) return;
+      const msgs = await r.json();
+      const lastSeen = parseInt(localStorage.getItem(UNREAD_KEY) || '0', 10);
+      const unread = msgs.filter(m=> (m.timestamp||0) > lastSeen).length;
+      updateUnreadBadge(unread);
+    } catch(e){}
+  }, 5000);
+}
 
-    // Auto-scroll logic
-  const container = elements.chatContainer;
-  const wasNearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 60;
-  
-  // Reset container
-  container.innerHTML = "";
-  
-  // Map for message references
-  const messagesById = new Map(data.map(m => [m.id, m]));
-  
-  // Track changes
+async function deleteMessage(messageId) {
+  if (!isLoggedIn || !sessionToken) { showLoginScreen(); return; }
+  try {
+    const r = await fetch(`${BACKEND_URL}/delete_message`, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ chat_id: chatId, message_id: messageId, user_id: 'user' }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Delete failed');
+    await loadMessages();
+  } catch (e) { console.error('deleteMessage', e); if (String(e).includes('expired')) { isLoggedIn=false; sessionToken=null; showLoginScreen(); } }
+}
+
+async function loadMessages() {
+  if (!isLoggedIn || !isThisTabActive) return;
+  const isTabActive = document.visibilityState === "visible";
+  const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=user&active=${isTabActive}`);
+  if (!res.ok) return;
+  const data = await res.json();
+
+  // Build messages with timestamps, reactions, reply previews and options
+  chatContainer.innerHTML = "";
+
   const currentMessageIds = data.map((m, i) => `${m.sender}-${m.text}-${i}`);
-  const newMessages = data.filter((m, i) => !state.lastProcessedMessages.includes(`${m.sender}-${m.text}-${i}`));
-  
-  // Check for special messages
-  const hasNewLove = newMessages.some(m => m.text?.match(/\blove\b/i));
-  const hasNewGoodnight = newMessages.some(m => m.text?.match(/\b(goodnight|gn|gnsd|gntc|gnsdtc)\b/i));
-  
+  const newMessages = data.filter((m, i) => !lastProcessedMessages.includes(`${m.sender}-${m.text}-${i}`));
+  const hasNewLove = newMessages.some(m => m.text && /\blove\b/i.test(m.text));
+  const hasNewGoodnight = newMessages.some(m => m.text && /\b(goodnight|gn|gnsd|gntc|gnsdtc)\b/i.test(m.text));
   if (hasNewLove) spawnLoveBubbles();
   if (hasNewGoodnight) spawnSleepBubbles();
 
-  state.lastProcessedMessages = currentMessageIds;
+  // map for quick reply lookups
+  const messagesById = new Map(data.map(m=>[m.id, m]));
 
-  // Track highest timestamp to support unread badge
+  // track highest timestamp for unread badge
   let highestTs = 0;
 
   data.forEach((m, i) => {
-    const d = document.createElement("div");
-    d.className = "message " + (m.sender === "user" ? "user-msg" : "agent-msg");
-    
-    // If this is a reply message, show the original message above
-    if (m.reply_to && messagesById[m.reply_to]) {
-      const originalMsg = messagesById[m.reply_to];
-      const replyToDiv = document.createElement("div");
-      replyToDiv.className = "reply-to";
-      replyToDiv.style.fontSize = "13px";
-      replyToDiv.style.padding = "8px 12px";
-      replyToDiv.style.background = "rgba(0,0,0,0.035)";
-      replyToDiv.style.borderRadius = "12px 12px 4px 4px";
-      replyToDiv.style.marginBottom = "4px";
-      replyToDiv.style.position = "relative";
-      replyToDiv.style.cursor = "pointer";
-      replyToDiv.style.border = "1px solid rgba(0,0,0,0.05)";
-      replyToDiv.style.borderBottom = "2px solid " + (originalMsg.sender === "user" ? "#ffcce0" : "#e0e0e0");
-      
-      // Add reply header with icon
-      const replyHeader = document.createElement("div");
-      replyHeader.style.display = "flex";
-      replyHeader.style.alignItems = "center";
-      replyHeader.style.marginBottom = "4px";
-      replyHeader.style.gap = "6px";
-      replyHeader.style.color = "#666";
-      
-      const replyIcon = document.createElement("span");
-      replyIcon.textContent = "↱";
-      replyIcon.style.fontSize = "16px";
-      replyHeader.appendChild(replyIcon);
-      
-      const replyText = document.createElement("span");
-      replyText.textContent = `Replying to ${originalMsg.sender}'s message:`;
-      replyText.style.fontSize = "12px";
-      replyHeader.appendChild(replyText);
-      
-      replyToDiv.appendChild(replyHeader);
-      
-      // Add original message preview with styling
-      const preview = document.createElement("div");
-      preview.style.display = "flex";
-      preview.style.flexDirection = "column";
-      preview.style.gap = "4px";
-      
-      // Message content
-      const content = document.createElement("div");
-      content.style.whiteSpace = "pre-wrap";
-      content.style.overflow = "hidden";
-      content.style.maxHeight = "3.6em";
-      content.style.color = "#000";
-      content.textContent = originalMsg.text || "(image)";
-      preview.appendChild(content);
-      
-      // Timestamp for original message
-      const timestamp = document.createElement("div");
-      timestamp.style.fontSize = "11px";
-      timestamp.style.color = "#888";
-      const dt = new Date((originalMsg.timestamp || Date.now()) * 1000);
-      timestamp.textContent = dt.toLocaleString([], { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric', 
-        hour: 'numeric', 
-        minute: '2-digit' 
-      });
-      preview.appendChild(timestamp);
-      
-      replyToDiv.appendChild(preview);
-        
-        // Click to scroll to original message
-        replyToDiv.addEventListener("click", () => {
-          const originalElement = document.querySelector(`[data-message-id="${m.reply_to}"]`);
-          if (originalElement) {
-            originalElement.scrollIntoView({ behavior: "smooth", block: "center" });
-            originalElement.style.backgroundColor = "rgba(255,235,238,0.5)";
-            setTimeout(() => {
-              originalElement.style.backgroundColor = "";
-            }, 2000);
-          }
-        });
-        
-        d.appendChild(replyToDiv);
-      }
+    const d = document.createElement('div');
+    d.className = 'message ' + (m.sender === 'user' ? 'user-msg' : 'agent-msg');
+    d.setAttribute('data-message-id', m.id);
+    d.style.position = 'relative';
 
-    // Add message ID for reply linking
-    d.setAttribute("data-message-id", m.id);
+    // If reply_to, show a small preview
+    if (m.reply_to && messagesById.has(m.reply_to)) {
+      const orig = messagesById.get(m.reply_to);
+      const replyDiv = document.createElement('div');
+      replyDiv.style.fontSize = '13px';
+      replyDiv.style.background = 'rgba(0,0,0,0.03)';
+      replyDiv.style.padding = '6px';
+      replyDiv.style.borderRadius = '8px';
+      replyDiv.style.marginBottom = '6px';
+      replyDiv.textContent = (orig.text || '(image)');
+      d.appendChild(replyDiv);
+    }
 
-    if (m.type === "image" && m.url) {
-      const img = document.createElement("img");
-      img.src = m.url;
-      img.style.maxWidth = "240px";
-      img.style.borderRadius = "12px";
-      img.style.display = "block";
-      img.style.marginBottom = "6px";
-
-      const download = document.createElement("a");
-      download.href = m.url;
-      download.download = "image.jpg";
-      download.textContent = "📥";
-      download.style.fontSize = "14px";
-      download.style.textDecoration = "none";
-      download.style.color = "#555";
-
+    if (m.type === 'image' && m.url) {
+      const img = document.createElement('img');
+      img.src = m.url; img.style.maxWidth='240px'; img.style.borderRadius='12px'; img.style.display='block'; img.style.marginBottom='6px';
       d.appendChild(img);
-      d.appendChild(download);
     } else {
-      d.innerHTML = (m.text || "").replace(/\n/g, "<br>");
+      const body = document.createElement('div');
+      body.innerHTML = (m.text || '').replace(/\n/g,'<br>');
+      d.appendChild(body);
     }
 
-        // Create timestamp element with tooltip
-    const timestamp = document.createElement('div');
-    timestamp.className = 'timestamp';
-    timestamp.style.fontSize = '11px';
-    timestamp.style.color = '#666';
-    timestamp.style.marginTop = '4px';
-    
-    const date = new Date((m.timestamp || Date.now()) * 1000);
-    const timeString = new Intl.DateTimeFormat('default', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    }).format(date);
-    
-    timestamp.textContent = timeString;
-    timestamp.title = date.toLocaleString();
+    // timestamp
+    const tsDiv = document.createElement('div');
+    tsDiv.style.fontSize = '11px'; tsDiv.style.color='#666'; tsDiv.style.marginTop='6px';
+    const ts = m.timestamp || Math.floor(Date.now()/1000);
+    const date = new Date(ts*1000);
+    const timeStr = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+    const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    tsDiv.textContent = `${dateStr}, ${timeStr}`;
+    tsDiv.title = date.toLocaleString();
+    d.appendChild(tsDiv);
 
-    // Options container toggled only by timestamp click
-    const options = document.createElement('div');
-    options.className = 'options';
-
-    timestamp.addEventListener('click', (e) => {
-      e.stopPropagation();
-      document.querySelectorAll('.options.show').forEach(o => { if (o !== options) o.classList.remove('show'); });
-      options.classList.toggle('show');
-    });
-
-// 1) Edit (user only)
-      if (m.sender === 'user') {
-        const editBtn = document.createElement('button'); editBtn.className = 'option-btn'; editBtn.title = 'Edit'; editBtn.textContent = '✏️';
-        editBtn.addEventListener('click', async (ev) => {
-          ev.stopPropagation();
-          // Store the message being edited
-          state.messageBeingEdited = m.id;
-          // Move text to input box
-          elements.msgInput.value = m.text;
-          elements.msgInput.focus();
-          // Show edit mode indicator
-          const editIndicator = document.createElement('div');
-          editIndicator.id = 'edit-indicator';
-          editIndicator.style.padding = '8px';
-          editIndicator.style.background = '#fff3e0';
-          editIndicator.style.marginBottom = '8px';
-          editIndicator.style.borderRadius = '8px';
-          editIndicator.style.display = 'flex';
-          editIndicator.style.alignItems = 'center';
-          editIndicator.style.gap = '8px';
-          
-          const editInfo = document.createElement('div');
-          editInfo.style.flex = '1';
-          editInfo.textContent = 'Editing message...';
-          
-          const cancelBtn = document.createElement('button');
-          cancelBtn.style.padding = '4px 8px';
-          cancelBtn.style.fontSize = '12px';
-          cancelBtn.textContent = '❌ Cancel Edit';
-          cancelBtn.onclick = () => {
-            state.messageBeingEdited = null;
-            elements.msgInput.value = '';
-            editIndicator.remove();
-          };
-          
-          editIndicator.appendChild(editInfo);
-          editIndicator.appendChild(cancelBtn);
-          
-          // Remove any existing indicators
-          document.querySelectorAll('#edit-indicator, #reply-indicator').forEach(el => el.remove());
-          document.getElementById('input-container').insertBefore(editIndicator, elements.msgInput);
-          
-          options.classList.remove('show');
-        });
-        options.appendChild(editBtn);      // 2) Delete - no confirmation
-      const delBtn = document.createElement('button'); delBtn.className = 'option-btn'; delBtn.title = 'Delete'; delBtn.textContent = '🗑️';
-      delBtn.addEventListener('click', (ev) => { 
-        ev.stopPropagation(); 
-        deleteMessage(m.id); 
-        options.classList.remove('show');
-      });
-      options.appendChild(delBtn);
-    }
-
-    // 3) Emoji / React
-    const reactBtn = document.createElement('button');
-    reactBtn.className = 'option-btn';
-    reactBtn.title = 'React';
-    reactBtn.textContent = '😊';
-    reactBtn.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-  const picker = elements.emojiPicker.cloneNode(true);
-      picker.id = '';
-      picker.style.display = 'block';
-      picker.style.position = 'absolute';
-      picker.style.zIndex = '1000';
-      picker.style.left = '0';
-      picker.style.bottom = '100%';
-      
-      // Position the picker above the message
-      options.appendChild(picker);
-      
-      // Handle emoji selection
-      picker.querySelectorAll('.emoji-btn').forEach(b => {
-        b.addEventListener('click', (e) => {
-          e.stopPropagation();
-          addReaction(m.id, b.dataset.emoji);
-          picker.remove();
-          options.classList.remove('show');
-        });
-      });
-      
-      // Close picker when clicking outside
-      const closeHandler = (e) => {
-        if (!picker.contains(e.target) && e.target !== reactBtn) {
-          picker.remove();
-          document.removeEventListener('click', closeHandler);
-        }
-      };
-      document.addEventListener('click', closeHandler);
-      
-      // Quick reaction emojis (inline)
-      const inlineReactions = document.createElement('div');
-      inlineReactions.className = 'inline-reactions';
-      inlineReactions.style.display = 'flex';
-      inlineReactions.style.gap = '6px';
-
-      const quickEmojis = ['👍', '❤️', '😊', '😂', '😍', '🎉', '👏', '🔥'];
-      quickEmojis.forEach(emoji => {
-        const emojiBtn = document.createElement('button');
-        emojiBtn.className = 'quick-emoji-btn';
-        emojiBtn.textContent = emoji;
-        emojiBtn.style.padding = '6px';
-        emojiBtn.style.fontSize = '20px';
-        emojiBtn.style.border = 'none';
-        emojiBtn.style.background = 'transparent';
-        emojiBtn.style.cursor = 'pointer';
-        emojiBtn.style.borderRadius = '4px';
-        emojiBtn.style.transition = 'transform 0.1s';
-        emojiBtn.onmouseover = () => emojiBtn.style.transform = 'scale(1.2)';
-        emojiBtn.onmouseout = () => emojiBtn.style.transform = 'scale(1)';
-        emojiBtn.onclick = (e) => {
-          e.stopPropagation();
-          addReaction(m.id, emoji);
-          inlineReactions.remove();
-          options.classList.remove('show');
-        };
-        inlineReactions.appendChild(emojiBtn);
-      });
-      
-  // Add "More" button that shows full picker
-      const moreBtn = document.createElement('button');
-      moreBtn.textContent = '⋯';
-      moreBtn.style.padding = '6px 12px';
-      moreBtn.style.fontSize = '16px';
-      moreBtn.style.border = 'none';
-      moreBtn.style.background = '#f0f0f0';
-      moreBtn.style.cursor = 'pointer';
-      moreBtn.style.borderRadius = '4px';
-      moreBtn.onclick = (e) => {
-        e.stopPropagation();
-        const picker = elements.emojiPicker.cloneNode(true);
-        picker.style.display = 'block';
-        inlineReactions.replaceWith(picker);
-        picker.querySelectorAll('.emoji-btn').forEach(b => {
-          b.addEventListener('click', (e) => {
-            e.stopPropagation();
-            addReaction(m.id, b.dataset.emoji);
-            picker.remove();
-            options.classList.remove('show');
-          });
-        });
-      };
-      inlineReactions.appendChild(moreBtn);
-      
-      // Replace any existing picker/reactions
-      const existing = d.querySelector('.inline-reactions, #emoji-picker');
-      if (existing) existing.remove();
-      d.appendChild(inlineReactions);
-    });
-    options.appendChild(reactBtn);
-
-        // Reply button with indicator
-    const replyBtn = document.createElement('button');
-    replyBtn.className = 'option-btn';
-    replyBtn.title = 'Reply';
-    replyBtn.textContent = '↩️';
-    replyBtn.style.cursor = 'pointer';
-    
-    replyBtn.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      state.replyingTo = m.id;
-      elements.msgInput.focus();
-      
-      // Setup reply indicator
-      const replyIndicator = document.createElement('div');
-      replyIndicator.id = 'reply-indicator';
-      Object.assign(replyIndicator.style, {
-        padding: '8px',
-        background: '#f0f0f0',
-        marginBottom: '8px',
-        borderRadius: '8px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: '13px'
-      });
-      
-      // Add reply icon and sender info
-      const replyInfo = document.createElement('div');
-      replyInfo.style.flex = '1';
-      replyInfo.innerHTML = `<div style="font-size:12px;color:#666;margin-bottom:2px">↳ Replying to ${m.sender}:</div>`;
-      
-      // Add message preview with ellipsis if too long
-      const preview = document.createElement('div');
-      preview.style.whiteSpace = 'nowrap';
-      preview.style.overflow = 'hidden';
-      preview.style.textOverflow = 'ellipsis';
-      preview.textContent = m.text || '(image)';
-      replyInfo.appendChild(preview);
-      
-      // Add cancel button
-      const cancelBtn = document.createElement('button');
-      cancelBtn.style.padding = '4px 8px';
-      cancelBtn.style.fontSize = '12px';
-      cancelBtn.textContent = '❌ Cancel Reply';
-      cancelBtn.addEventListener('click', () => {
-        state.replyingTo = null;
-        replyIndicator.remove();
-      });
-      
-      replyIndicator.appendChild(replyInfo);
-      replyIndicator.appendChild(cancelBtn);
-      document.getElementById('input-container').insertBefore(replyIndicator, elements.msgInput);
-      options.classList.remove('show');
-    });
-    options.appendChild(replyBtn);
-
-    // Reactions display
-    if (m.reactions && Object.keys(m.reactions).length > 0) {
-      const reactionsDiv = document.createElement('div');
-      reactionsDiv.className = 'reactions';
-      reactionsDiv.style.display = 'flex';
-      reactionsDiv.style.flexWrap = 'wrap';
-      reactionsDiv.style.gap = '4px';
-      reactionsDiv.style.marginTop = '4px';
+    // reactions
+    if (m.reactions && Object.keys(m.reactions).length>0) {
+      const reactionsDiv = document.createElement('div'); reactionsDiv.className='reactions';
       Object.entries(m.reactions).forEach(([emoji, users]) => {
-        const reaction = document.createElement('div');
-        reaction.className = 'reaction';
-        reaction.style.background = '#f0f0f0';
-        reaction.style.padding = '2px 6px';
-        reaction.style.borderRadius = '12px';
-        reaction.style.cursor = 'pointer';
-        reaction.style.display = 'flex';
-        reaction.style.alignItems = 'center';
-        reaction.style.fontSize = '14px';
-        // Check if current user has reacted
-        const hasReacted = users.includes('user');
-        if (hasReacted) {
-          reaction.style.background = '#ffebee';
-        }
-        reaction.textContent = `${emoji} ${users.length}`;
-        reaction.title = hasReacted ? 'Click to remove reaction' : 'Click to add reaction';
-        reaction.addEventListener('click', () => addReaction(m.id, emoji));
-        reactionsDiv.appendChild(reaction);
+        const r = document.createElement('div'); r.className='reaction'; r.textContent = `${emoji} ${users.length}`;
+        r.addEventListener('click', (e)=>{ e.stopPropagation(); addReaction(m.id, emoji); });
+        reactionsDiv.appendChild(r);
       });
       d.appendChild(reactionsDiv);
     }
 
-  d.appendChild(timestamp);
-    d.appendChild(options);
+    // attach click handler to open options
+    d.addEventListener('click', (e)=>{ e.stopPropagation(); showMessageOptions(e, m, d); });
 
-    const isLast = i === data.length - 1;
-    if (m.sender === "user" && m.seen_by === "agent" && isLast) {
-      const seenTag = document.createElement("div");
-      seenTag.style.fontSize = "12px";
-      seenTag.style.color = "#888";
-      seenTag.style.marginTop = "4px";
-      seenTag.textContent = "✓";
-      d.appendChild(seenTag);
-    }
-
-  elements.chatContainer.appendChild(d);
+    chatContainer.appendChild(d);
 
     if (m.timestamp) highestTs = Math.max(highestTs, m.timestamp);
   });
 
-  if (data.length > state.lastMessageCount) {
-    state.lastMessageCount = data.length;
-  }
+  lastProcessedMessages = currentMessageIds;
+  if (data.length > lastMessageCount) lastMessageCount = data.length;
 
-  // Auto-scroll only if user was at/near bottom
-  if (wasNearBottom && !scrollManager.userScrolledUp) {
-    elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
-  }
+  // Auto-scroll only when user is near bottom
+  const nearBottom = chatContainer.scrollTop + chatContainer.clientHeight >= chatContainer.scrollHeight - 80;
+  if (nearBottom) chatContainer.scrollTop = chatContainer.scrollHeight;
 
-  // Update unread badge for non-logged users via localStorage comparison
+  // Update public unread badge when logged out
   try {
-    const stored = parseInt(localStorage.getItem('regal_last_seen_ts') || '0', 10);
-    const unread = data.filter(m => (m.timestamp || 0) > stored).length;
-    setUnreadBadge(unread);
-  } catch (e) { /* ignore */ }
-  } catch (error) {
-    console.error('loadMessages error:', error);
-  }
+    const stored = parseInt(localStorage.getItem(UNREAD_KEY) || '0', 10);
+    const unread = data.filter(m => (m.timestamp||0) > stored).length;
+    updateUnreadBadge(unread);
+  } catch(e){}
+}
 
 async function loadTyping() {
-  if (!state.isLoggedIn) return;
+  if (!isLoggedIn || !isThisTabActive) return;
+  const res = await fetch(`${BACKEND_URL}/get_live_typing/${chatId}`);
+  const d = await res.json();
 
-  try {
-    const res = await fetch(`${BACKEND_URL}/get_live_typing/${chatId}`);
-    if (!res.ok) {
-      throw new Error(`HTTP error! status: ${res.status}`);
-    }
+  const oldTyping = document.getElementById("agent-typing-indicator");
+  if (oldTyping) oldTyping.remove();
 
-    const data = await res.json();
-
-    const oldTyping = document.getElementById("agent-typing-indicator");
-    if (oldTyping) oldTyping.remove();
-
-    if (data.sender === "agent" && data.text) {
-      state.typingDots = (state.typingDots + 1) % 4;
-      const dots = ".".repeat(state.typingDots);
-      
-      const typingMsg = document.createElement("div");
-      typingMsg.id = "agent-typing-indicator";
-      typingMsg.className = "message agent-msg";
-      typingMsg.textContent = `Typing${dots}`;
-      
-      elements.chatContainer.appendChild(typingMsg);
-      elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
-    }
-  } catch (error) {
-    console.error('Error checking typing status:', error);
+  if (d.sender === "agent" && d.text) {
+    typingDots = (typingDots + 1) % 4;
+    const dots = ".".repeat(typingDots);
+    const typingMsg = document.createElement("div");
+    typingMsg.id = "agent-typing-indicator";
+    typingMsg.className = "message agent-msg";
+    typingMsg.textContent = `Typing${dots}`;
+    chatContainer.appendChild(typingMsg);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
   }
 }
 
 async function sendTyping(text) {
-  if (!state.isLoggedIn) return;
+  if (!isLoggedIn || !isThisTabActive) return;
   await fetch(`${BACKEND_URL}/live_typing`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${state.sessionToken}`
+      "Authorization": `Bearer ${sessionToken}`
     },
     body: JSON.stringify({ chat_id: chatId, sender: "user", text })
   });
 }
 
 async function checkStatus() {
-  if (!state.isLoggedIn) return;
-  const res = await fetch(`${BACKEND_URL}/is_online/${chatId}?t=${Date.now()}`, {
-    headers: { 'Authorization': `Bearer ${state.sessionToken}` }
-  });
+  if (!isLoggedIn || !isThisTabActive) return;
+  const res = await fetch(`${BACKEND_URL}/is_online/${chatId}?t=${Date.now()}`);
   const d = await res.json();
   const emoji = d.agent_online ? "🟢" : "🔴";
   const time = d.agent_online ? "" : ` ${d.agent_last_seen}`;
-  elements.agentStatus.textContent = `${emoji}${time}`;
+  agentStatus.textContent = `${emoji}${time}`;
 }
 
 async function clearChat() {
-  if (!state.isLoggedIn) return;
+  if (!isLoggedIn || !isThisTabActive) return;
   await fetch(`${BACKEND_URL}/clear_chat/${chatId}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${state.sessionToken}`
+      "Authorization": `Bearer ${sessionToken}`
     },
     body: JSON.stringify({ sender: "user" })
   });
-  elements.chatContainer.innerHTML = "";
-  state.lastMessageCount = 0;
-  state.lastProcessedMessages = [];
-}
-
-// Add / edit / delete / react helper functions
-async function addReaction(messageId, emoji) {
-  if (!state.isLoggedIn || !state.sessionToken) {
-    showLoginScreen();
-    return;
-  }
-
-  try {
-    const response = await fetch(`${BACKEND_URL}/react`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json', 
-        'Authorization': `Bearer ${state.sessionToken}`
-      },
-      body: JSON.stringify({ 
-        chat_id: chatId, 
-        message_id: messageId, 
-        reaction: emoji, 
-        user_id: 'user' 
-      })
-    });
-
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to add reaction');
-    }
-    
-    // Close any open emoji pickers and refresh messages
-    document.querySelectorAll('.inline-reactions').forEach(el => el.remove());
-    await loadMessages();
-  } catch (error) {
-    if (error.message.includes('expired')) {
-      state.isLoggedIn = false;
-      state.sessionToken = null;
-      showLoginScreen();
-    } else {
-      alert('Failed to add reaction: ' + error.message);
-    }
-  }
-}
-
-async function deleteMessage(messageId) {
-  if (!state.isLoggedIn) {
-    showLoginScreen();
-    return;
-  }
-
-  try {
-    const response = await fetch(`${BACKEND_URL}/delete_message`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${state.sessionToken}`
-      },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId,
-        user_id: 'user'
-      })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to delete message');
-    }
-
-    await loadMessages();
-  } catch (error) {
-    if (error.message.includes('expired')) {
-      state.isLoggedIn = false;
-      state.sessionToken = null;
-      showLoginScreen();
-    } else {
-      alert('Failed to delete message: ' + error.message);
-    }
-  }
-}
-
-async function editMessage(messageId, newText) {
-  if (!state.isLoggedIn) return;
-  try {
-    const r = await fetch(`${BACKEND_URL}/edit_message`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.sessionToken}` }, body: JSON.stringify({ chat_id: chatId, message_id: messageId, text: newText, user_id: 'user' }) });
-    if (!r.ok) throw new Error('edit failed');
-    loadMessages();
-  } catch (e) {
-    console.error('Edit message error', e);
-    alert('Failed to edit');
-  }
+  chatContainer.innerHTML = "";
+  lastMessageCount = 0;
+  lastProcessedMessages = [];
 }
 
 async function markOnline() {
-  if (!state.isLoggedIn) return;
+  if (!isLoggedIn || !isThisTabActive) return;
   await fetch(`${BACKEND_URL}/mark_online`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${state.sessionToken}`
+      "Authorization": `Bearer ${sessionToken}`
     },
     body: JSON.stringify({ chat_id: chatId, sender: "user" })
   });
 }
 
-elements.uploadBtn.addEventListener("click", () => elements.fileInput.click());
+uploadBtn.addEventListener("click", () => fileInput.click());
 
-elements.fileInput.addEventListener("change", async () => {
-  const file = elements.fileInput.files[0];
-  if (!file || !state.isLoggedIn || !state.sessionToken) return;
+fileInput.addEventListener("change", async () => {
+  const file = fileInput.files[0];
+  if (!file || !isLoggedIn || !sessionToken || !isThisTabActive) return;
 
   const reader = new FileReader();
   reader.onload = async () => {
@@ -1200,7 +836,7 @@ elements.fileInput.addEventListener("change", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${state.sessionToken}`
+        "Authorization": `Bearer ${sessionToken}`
       },
       body: JSON.stringify({
         chat_id: chatId,
@@ -1214,53 +850,29 @@ elements.fileInput.addEventListener("change", async () => {
   reader.readAsDataURL(file);
 });
 
-// Event Listeners
-function setupEventListeners() {
-  const { sendBtn, clearBtn, msgInput } = elements;
-  
-  // Send button
-  sendBtn.addEventListener("mousedown", e => e.preventDefault());
-  sendBtn.addEventListener("click", sendMessage);
-  
-  // Clear button
-  clearBtn.addEventListener("click", clearChat);
-  
-  // Message input events
-  msgInput.addEventListener("input", e => sendTyping(e.target.value));
-  
-  // Handle Enter key
-  msgInput.addEventListener("keydown", async (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      await sendMessage();
-    }
-  });
-  
-  // Input focus check
-  msgInput.addEventListener("focus", () => {
-    if (!state.isLoggedIn) {
-      showLoginScreen();
-    }
-  });
-  
-  // Page visibility
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") {
-      if (!state.isLoggedIn) {
-        showLoginScreen();
-      } else {
+sendBtn.addEventListener("mousedown", e => e.preventDefault());
+sendBtn.addEventListener("click", sendMessage);
+clearBtn.addEventListener("click", clearChat);
+msgInput.addEventListener("input", e => sendTyping(e.target.value));
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    // When tab becomes visible, re-check the lock
+    checkSessionLock();
+    if (isLoggedIn) {
         markOnline();
         loadMessages();
-      }
     }
-  });
-}
+  }
+});
 
 window.addEventListener("beforeunload", () => {
-  // Clean up on window close
-  try {
-    if (typeof LOCK_KEY !== 'undefined') localStorage.removeItem(LOCK_KEY);
-  } catch (e) { /* ignore */ }
+  // --- Release lock if this tab is the active one ---
+  if (isThisTabActive) {
+    // This is a synchronous operation, it's safe here
+    localStorage.removeItem(LOCK_KEY);
+  }
+  // --- End Release ---
 
   try {
     const data = JSON.stringify({ chat_id: chatId, sender: "user" });
@@ -1307,145 +919,24 @@ function spawnSleepBubbles() {
   setTimeout(() => txt.remove(), 4000);
 }
 
-// Unread / notification badge helpers (works for logged-out users using localStorage timestamp)
-function setUnreadBadge(count) {
-  try {
-    const badge = elements.unreadBadge;
-    if (!badge) return;
-    if (count && count > 0) {
-      badge.style.display = 'inline-block';
-      badge.textContent = count > 99 ? '99+' : String(count);
-      document.title = `(${count}) ${document.title.replace(/^\(\d+\)\s*/, '')}`;
-    } else {
-      badge.style.display = 'none';
-      document.title = document.title.replace(/^\(\d+\)\s*/, '');
+// --- Run the lock check on page load ---
+document.addEventListener('DOMContentLoaded', () => {
+    checkSessionLock();
+    // start public unread polling for logged-out users
+    try { startPublicUnreadPoll(); } catch(e){}
+    if (unreadBadge) {
+      unreadBadge.addEventListener('click', async ()=>{
+        try {
+          const r = await fetch(`${BACKEND_URL}/messages/${chatId}`);
+          if (!r.ok) return;
+          const msgs = await r.json();
+          const maxTs = Math.max(0, ...msgs.map(m=>m.timestamp||0));
+          localStorage.setItem(UNREAD_KEY, String(maxTs));
+          updateUnreadBadge(0);
+        } catch(e){}
+      });
     }
-  } catch (e) { /* ignore */ }
-}
-
-// Force-clear any leftover lock keys and hide the lock overlay so user can login again
-function forceClearLock(e) {
-  if (e && e.preventDefault) e.preventDefault();
-  try {
-    // Remove any localStorage keys that look like locks (defensive)
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-      const k = localStorage.key(i);
-      if (!k) continue;
-      if (k.toLowerCase().includes('lock')) {
-        localStorage.removeItem(k);
-      }
-    }
-  } catch (err) {
-    console.warn('forceClearLock localStorage cleanup failed', err);
-  }
-
-  const lo = document.getElementById('lock-overlay');
-  if (lo) lo.style.display = 'none';
-  // Show login so user can re-authenticate
-  try { showLoginScreen(); } catch (e2) { /* ignore */ }
-  return false;
-}
-
-const notificationManager = {
-  lastSeenKey: 'regal_last_seen_ts',
-  
-  async pollPublicCounts() {
-    if (state.isLoggedIn) return; // Only poll when logged out
-    
-    try {
-      const res = await fetch(`${BACKEND_URL}/messages/${chatId}`);
-      if (!res.ok) throw new Error('Failed to fetch messages');
-      
-      const messages = await res.json();
-      if (!Array.isArray(messages)) return;
-      
-      const lastSeen = parseInt(localStorage.getItem(this.lastSeenKey) || '0', 10);
-      const unread = messages.filter(m => (m.timestamp || 0) > lastSeen).length;
-      
-      this.updateBadge(unread);
-      this.updateTitle(unread);
-    } catch (error) {
-      console.warn('Failed to poll unread count:', error);
-    }
-  },
-  
-  updateBadge(count) {
-    const badge = elements.unreadBadge;
-    if (!badge) return;
-    
-    badge.style.display = count > 0 ? 'inline-block' : 'none';
-    badge.textContent = count > 99 ? '99+' : String(count);
-  },
-  
-  updateTitle(count) {
-    document.title = count > 0 
-      ? `(${count}) ${document.title.replace(/^\(\d+\)\s*/, '')}` 
-      : document.title.replace(/^\(\d+\)\s*/, '');
-  },
-  
-  markSeen() {
-    const now = Math.floor(Date.now() / 1000);
-    localStorage.setItem(this.lastSeenKey, String(now));
-    this.updateBadge(0);
-    this.updateTitle(0);
-  }
-};
-
-// Mark seen when clicking the badge
-if (elements.unreadBadge) {
-  elements.unreadBadge.addEventListener('click', () => {
-    fetch(`${BACKEND_URL}/messages/${chatId}`).then(r=>r.json()).then(msgs=>{
-      const maxTs = Math.max(0, ...msgs.map(m=>m.timestamp||0));
-      localStorage.setItem('regal_last_seen_ts', String(maxTs));
-      setUnreadBadge(0);
-    }).catch(()=>{});
-  });
-}
-
-// Initialize the application
-function initializeApp() {
-  // Initialize managers
-  scrollManager.init();
-  
-  // Defensive: clear any stale lock keys and ensure the lock overlay is hidden so login isn't blocked
-  try {
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-      const k = localStorage.key(i);
-      if (!k) continue;
-      if (k.toLowerCase().includes('lock')) localStorage.removeItem(k);
-    }
-  } catch (e) { console.warn('initializeApp lock cleanup failed', e); }
-
-  const lockEl = document.getElementById('lock-overlay');
-  if (lockEl) lockEl.style.display = 'none';
-
-  // Show login screen initially
-  showLoginScreen();
-  
-  // Set up all event listeners
-  setupEventListeners();
-  
-  // Start unread count polling for logged-out state
-  setInterval(() => notificationManager.pollPublicCounts(), 5000);
-  notificationManager.pollPublicCounts(); // Initial poll
-  
-  // Handle unread badge clicks
-  if (elements.unreadBadge) {
-    elements.unreadBadge.addEventListener('click', () => {
-      notificationManager.markSeen();
-    });
-  }
-  
-  // Handle visibility changes
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && state.isLoggedIn) {
-      notificationManager.markSeen();
-    }
-  });
-}
-
-// Run initialization on page load
-document.addEventListener('DOMContentLoaded', initializeApp);
+});
 </script>
 </body>
 </html>
