@@ -409,14 +409,25 @@
 </div>
 <script>
 // --- *** START: localStorage TAB LOCK *** ---
-const LOCK_KEY = 'regal_chat_session_lock';
-const LOCK_TIMEOUT_MS = 10000; // 10 seconds
+const LOCK_KEY = 'regal_chat_session_lock_user'; // Separate locks for user and agent
+const LOCK_TIMEOUT_MS = 30000; // 30 seconds timeout
 const thisTabId = Date.now().toString() + Math.random();
 let isThisTabActive = false; // Flag to track if this tab holds the lock
 let sessionCheckInterval = null; // Holds the interval timer
 
-// Clear any existing lock on page load
-localStorage.removeItem(LOCK_KEY);
+// Don't clear lock on page load - instead check if it's valid
+try {
+    const existingLock = JSON.parse(localStorage.getItem(LOCK_KEY));
+    if (existingLock) {
+        const isStale = Date.now() - existingLock.timestamp > LOCK_TIMEOUT_MS;
+        if (isStale) {
+            console.log('Found stale lock, clearing');
+            localStorage.removeItem(LOCK_KEY);
+        }
+    }
+} catch (e) {
+    console.warn('Invalid lock data found, clearing');
+    localStorage.removeItem(LOCK_KEY);
 
 // *** NEW: ADDED THIS FUNCTION ***
 /**
