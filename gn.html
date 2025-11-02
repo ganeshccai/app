@@ -3,419 +3,278 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
-  <title>R</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' style='stop-color:%23feda75'/><stop offset='25%' style='stop-color:%23fa7e1e'/><stop offset='50%' style='stop-color:%23d62976'/><stop offset='75%' style='stop-color:%23962fbf'/><stop offset='100%' style='stop-color:%234f5bd5'/></linearGradient></defs><rect width='100' height='100' rx='20' fill='url(%23grad)'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white' font-family='serif' font-style='italic' font-weight='bold'>R</text></svg>" />
-  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' style='stop-color:%23feda75'/><stop offset='25%' style='stop-color:%23fa7e1e'/><stop offset='50%' style='stop-color:%23d62976'/><stop offset='75%' style='stop-color:%23962fbf'/><stop offset='100%' style='stop-color:%234f5bd5'/></linearGradient></defs><rect width='100' height='100' rx='20' fill='url(%23grad)'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white' font-family='serif' font-style='italic' font-weight='bold'>R</text></svg>" />
-  <meta name="theme-color" content="#d62976" />
-  <link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22Regal%22%2C%22short_name%22%3A%22Regal%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f3f6fb%22%2C%22theme_color%22%3A%22%23d62976%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20512%20512%27%3E%3Cdefs%3E%3ClinearGradient%20id%3D%27grad%27%20x1%3D%270%25%27%20y1%3D%270%25%27%20x2%3D%27100%25%27%20y2%3D%27100%25%27%3E%3Cstop%20offset%3D%270%25%27%20style%3D%27stop-color%3A%23feda75%27%2F%3E%3Cstop%20offset%3D%2725%25%27%20style%3D%27stop-color%3A%23fa7e1e%27%2F%3E%3Cstop%20offset%3D%2750%25%27%20style%3D%27stop-color%3A%23d62976%27%2F%3E%3Cstop%20offset%3D%2775%25%27%20style%3D%27stop-color%3A%23962fbf%27%2F%3E%3Cstop%20offset%3D%27100%25%27%20style%3D%27stop-color%3A%234f5bd5%27%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%27512%27%20height%3D%27512%27%20rx%3D%27100%27%20fill%3D%27url(%23grad)%27%2F%3E%3Ctext%20x%3D%27256%27%20y%27360%27%20font-size%3D%27300%27%20text-anchor%3D%27middle%27%20fill%3D%27white%27%20font-family%3D%27serif%27%20font-style%3D%27italic%27%20font-weight%3D%27bold%27%3ER%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D" />
-<style>
-  /* ... (All your existing CSS styles are unchanged) ... */
-  @keyframes gnReshmaFade {
-  0% {
-    opacity: 0;
-    transform: translateX(-50%) scale(0.5);
-  }
-  50% {
-    opacity: 1;
-    transform: translateX(-50%) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(-50%) scale(0.5);
-  }
-}
-  
-  :root {
-    --accent: #feda75;
-    --accent2: #d62976;
-    --bg: linear-gradient(135deg, #feda75, #fa7e1e, #d62976, #962fbf, #4f5bd5);
-    --bubble-user: #ffcce0;
-    --bubble-agent: #ffffff;
-    --agent-border: #e0e0e0;
-  }
-  html, body {
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-  }
-  body {
-    font-family: 'Segoe UI', sans-serif;
-    display: flex;
-    flex-direction: column;
-    background: var(--bg);
-    background-size: cover;
-    background-repeat: no-repeat;
-    color: #333;
-  }
-  header {
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    color: white;
-    padding: 14px;
-    text-align: center;
-    font-weight: bold;
-    font-size: 20px;
-    position: relative;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  }
-  #agent-status {
-    position: absolute;
-    right: 14px;
-    top: 14px;
-    font-weight: bold;
-  }
-  #send-btn{
-    font-size: 35px;
-  }
-
-  #clear-btn {
-    font-size: 10px;
-  }
-  #chat-container {
-    flex: 1;
-    overflow-y: auto;
-    padding: 10px;
-    display: flex;
-    flex-direction: column;
-    background-color: #f8f8f8;
-    position: relative;
-  }
-  .message {
-    margin: 4px 0;
-    padding: 10px 14px;
-    border-radius: 14px;
-    max-width: 80%;
-    word-wrap: break-word;
-    font-size: 15px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
-    position: relative;
-  }
-  
-  .message .timestamp {
-    font-size: 11px;
-    color: #777;
-    margin-top: 4px;
-    display: block;
-  }
-  
-  .message .reactions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 4px;
-  }
-  
-  .reaction {
-    background: rgba(255,255,255,0.9);
-    padding: 2px 6px;
-    border-radius: 12px;
-    font-size: 12px;
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    cursor: pointer;
-    border: 1px solid #ddd;
-  }
-  
-.message {
-  cursor: pointer;
-}
-
-.message .options {
-  position: absolute;
-  right: -40px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: none;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  z-index: 10;
-}
-
-.message .options.show {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 4px;
-}  .option-btn {
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 14px;
-    padding: 0;
-  }
-  
-  .option-btn:hover {
-    background: #f0f0f0;
-  }
-  
-  .reply-to {
-    background: rgba(0,0,0,0.05);
-    padding: 8px;
-    border-radius: 8px;
-    margin-bottom: 6px;
-    font-size: 13px;
-    border-left: 3px solid var(--accent2);
-  }
-  
-  #chat-container {
-    scroll-behavior: smooth;
-  }
-  
-  .unread-badge {
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    background: red;
-    color: white;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: bold;
-    z-index: 1000;
-    display: none;
-  }
-  .user-msg {
-    background: var(--bubble-user);
-    align-self: flex-end;
-  }
-  .agent-msg {
-    background: var(--bubble-agent);
-    border: 1px solid var(--agent-border);
-    align-self: flex-start;
-  }
-  #input-container {
-    display: flex;
-    gap: 10px;
-    padding: 12px;
-    background: rgba(255,255,255,0.9);
-    border-top: 1px solid #ccc;
-    position: relative;
-    min-width:50px;
-    max-height:100px;
-  }
-  #msg {
-    flex: 1;
-    resize: none;
-    border-radius: 14px;
-    padding: 12px;
-    border: 1px solid #ccc;
-    font-size: 16px;
-    outline: none;
-    max-height: 100px;
-    min-width:150px
-  }
-  #msg:focus {
-    border-color: var(--accent2);
-  }
-  button {
-    padding: 12px 16px;
-    background: #FFB6C1;
-    color: white;
-    border: none;
-    border-radius: 14px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background 0.3s ease;
-  }
-  button:hover {
-    background: #c2185b;
-  }
-  button:active {
-    opacity: 0.9;
-  }
-  
-  #login-overlay {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(255,255,255,0.95);
-    display: none; /* Hidden by default */
-    justify-content: center;
-    align-items: center;
-    z-index: 999;
-  }
-  
-  #login-box {
-    background: #fff;
-    padding: 24px;
-    border-radius: 12px;
-    box-shadow: 0 0 12px rgba(0,0,0,0.15);
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    width: 280px;
-  }
-  #login-box input {
-    padding: 10px;
-    font-size: 16px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    outline: none;
-  }
-
-  /* Emoji and Upload buttons container */
-  .extra-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    position: relative;
-  }
-  
-  .extra-buttons button {
-    padding: 10px 14px;
-    font-size: 10px;
-  }
-
-  /* Emoji picker popup */
-  #emoji-picker {
-    position: absolute;
-    bottom: 100%;
-    right: 0;
-    background: white;
-    border: 2px solid #ccc;
-    border-radius: 12px;
-    padding: 2px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    display: none;
-    max-width: 250px;
-    max-height: 240px;
-    overflow-y: auto;
-    margin: 5px;
-    z-index: 100;
-  }
-  
-  #emoji-picker.show {
-    display: block;
-  }
-  
-  .emoji-grid {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 5px;
-  }
-  
-  .emoji-btn {
-    background: transparent;
-    border: none;
-    font-size: 20px;
-    margin:5px;
-    padding: 5px;
-    cursor: pointer;
-    border-radius: 6px;
-    transition: background 0.2s;
-  }
-  
-  .emoji-btn:hover {
-    background: #f0f0f0;
-  }
-
-  /* 💖 Love Bubble Animation - Slow flight from bottom to middle */
-  .bubble {
-    position: fixed;
-    bottom: 80px;
-    font-size: 60px;
-    animation: floatUpSlow 3s linear forwards;
-    pointer-events: none;
-    z-index: 100;
-  }
-  @keyframes floatUpSlow {
-    0% {
-      transform: translateY(0) translateX(-50%);
-      opacity: 1;
+  <title>Agent Chat</title>
+  <style>
+    :root {
+      --accent: #3b82f6;
+      --accent2: #2563eb;
+      --bg: #f3f6fb;
+      --bubble-user: #ffffff;
+      --bubble-agent: #dbeafe;
+      --user-border: #dcdcdc;
     }
-    90% {
-      opacity: 1;
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
     }
-    100% {
-      transform: translateY(calc(-50vh + 40px)) translateX(-50%);
-      opacity: 0;
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      color: #333;
     }
-  }
-</style>
+    header {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      color: white;
+      padding: 14px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 20px;
+      position: relative;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    #user-status {
+      position: absolute;
+      right: 14px;
+      top: 14px;
+      font-weight: bold;
+    }
+    #chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      background: #f8f9fb;
+    }
+    .message {
+      margin: 6px 0;
+      padding: 10px 14px;
+      border-radius: 14px;
+      max-width: 80%;
+      word-wrap: break-word;
+      font-size: 15px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      position: relative;
+    }
+
+    .message .timestamp {
+      font-size: 11px;
+      color: #777;
+      margin-top: 4px;
+      display: block;
+    }
+    
+    .message .reactions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    
+    .reaction {
+      background: rgba(255,255,255,0.9);
+      padding: 2px 6px;
+      border-radius: 12px;
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      cursor: pointer;
+      border: 1px solid #ddd;
+    }
+    
+    .message .options {
+      position: absolute;
+      right: -40px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: none;
+    }
+    
+    .message:hover .options {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    
+    .option-btn {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0;
+    }
+    
+    .option-btn:hover {
+      background: #f0f0f0;
+    }
+    
+    .reply-to {
+      background: rgba(0,0,0,0.05);
+      padding: 8px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      border-left: 3px solid var(--accent);
+    }
+    
+    #chat-container {
+      scroll-behavior: smooth;
+    }
+    
+    .unread-badge {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: red;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      z-index: 1000;
+      display: none;
+    }
+
+    .emoji-picker {
+      background: white;
+      border: 2px solid #ccc;
+      border-radius: 12px;
+      padding: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 100;
+    }
+    
+    .emoji-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 5px;
+    }
+    
+    .emoji-btn {
+      background: transparent;
+      border: none;
+      font-size: 20px;
+      padding: 5px;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    
+    .emoji-btn:hover {
+      background: #f0f0f0;
+    }
+    .user-msg {
+      background: var(--bubble-user);
+      border: 1px solid var(--user-border);
+      align-self: flex-start;
+    }
+    .agent-msg {
+      background: var(--bubble-agent);
+      align-self: flex-end;
+    }
+    #input-container {
+      display: flex;
+      gap: 10px;
+      padding: 12px;
+      background: #fff;
+      border-top: 1px solid #ccc;
+    }
+    #msg {
+      flex: 1;
+      resize: none;
+      border-radius: 14px;
+      padding: 12px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+      outline: none;
+      max-height: 120px;
+    }
+    #msg:focus {
+      border-color: var(--accent);
+    }
+    button {
+      padding: 12px 16px;
+      background: var(--accent2);
+      color: white;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background 0.3s ease;
+    }
+    button:hover {
+      background: #1e40af;
+    }
+    button:active {
+      opacity: 0.9;
+    }
+    #login-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,0.95);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+    #login-box {
+      background: #fff;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 0 12px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 280px;
+    }
+    #login-box input {
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      outline: none;
+    }
+  </style>
 </head>
 <body data-chat-id="1234">
 
 <div id="login-overlay">
   <div id="login-box">
     <input type="password" id="pwd" placeholder="Enter password" />
-    <button onclick="checkPwd()">Login 🔓</button>
+    <button onclick="checkPwd()">Login ➡️</button>
     <div id="login-msg" style="color:red;"></div>
   </div>
 </div>
 
-<div id="lock-overlay" style="display:none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(220, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; z-index: 1000; color: white; text-align: center; font-size: 22px; font-weight: bold; padding: 20px;">
-  <div>
-    🚫 Session Locked
-    <p style="font-size: 18px; font-weight: normal; margin-top: 15px;">This application is already open and active in another tab.<br>Please close this tab.</p>
-    
-    <p style="font-size: 16px; font-weight: normal; margin-top: 25px;">
-      If the other tab is closed, 
-      <a href="#" onclick="forceClearLock(event)" style="color: #fff; font-weight: bold; text-decoration: underline;">
-        Click here to force unlock.
-      </a>
-    </p>
-    </div>
-</div>
-<header>𝓡𝓮𝓰𝓪𝓵 <span id="agent-status">🔴</span></header>
+<header>रेश्मा जंगले<span id="user-status">🔴</span></header>
 <div id="chat-container"></div>
 <div id="input-container">
-  <textarea id="msg" rows="2" placeholder="Type message..." autocomplete="off"></textarea>
-  
-  <div class="extra-buttons">
-    
-    <button id="emoji-btn">😊</button>
-      <input type="file" id="file-input" accept="image/*" style="display:none" />
-    <button id="upload-btn">🖼️</button>
-
-    <div id="emoji-picker">
-      <div class="emoji-grid">
-       <button class="emoji-btn" data-emoji="😊">😊</button>
-        <button class="emoji-btn" data-emoji="😂">😂</button>
-        <button class="emoji-btn" data-emoji="🤣">🤣</button>
-        <button class="emoji-btn" data-emoji="🥰">🥰</button>
-        <button class="emoji-btn" data-emoji="😀">😀</button>
-        <button class="emoji-btn" data-emoji="😢">😢</button>
-        <button class="emoji-btn" data-emoji="😁">😁</button>
-        <button class="emoji-btn" data-emoji="😍">😍</button>
-        <button class="emoji-btn" data-emoji="😎">😎</button>
-        <button class="emoji-btn" data-emoji="❤️">❤️</button>
-        <button class="emoji-btn" data-emoji="💖">💖</button>
-        <button class="emoji-btn" data-emoji="😭">😭</button>
-        <button class="emoji-btn" data-emoji="🤗">🤗</button>
-        <button class="emoji-btn" data-emoji="👍">👍</button>
-        <button class="emoji-btn" data-emoji="👋">👋</button>
-        <button class="emoji-btn" data-emoji="💯">💯</button>
-        <button class="emoji-btn" data-emoji="🙏">🙏</button>
-        <button class="emoji-btn" data-emoji="😴">😴</button>
-        <button class="emoji-btn" data-emoji="🔥">🔥</button>
-        <button class="emoji-btn" data-emoji="💕">💕</button>
-        <button class="emoji-btn" data-emoji="🎉">🎉</button>
-        <button class="emoji-btn" data-emoji="🌹">🌹</button>
-        <button class="emoji-btn" data-emoji="🎶">🎶</button>
-        <button class="emoji-btn" data-emoji="🥺">🥺</button>
-      </div>
-    </div><button id="clear-btn">❌</button>
-  
-  </div>
-    <button id="send-btn">➤</button>
-    
+  <textarea id="msg" rows="2" placeholder="Type reply..." autocomplete="off"></textarea>
+  <button id="send-btn">Send</button>
+  <button id="clear-btn">Clear</button>
+  <input type="file" id="file-input" accept="image/*" style="display:none" />
+  <button id="upload-btn">📎</button>
 </div>
 <script>
-// --- *** START: localStorage TAB LOCK *** ---
-const LOCK_KEY = 'regal_chat_session_lock_user'; // Separate locks for user and agent
+// Lock management
+const LOCK_KEY = 'regal_chat_session_lock_agent'; // Separate locks for user and agent
 const LOCK_TIMEOUT_MS = 30000; // 30 seconds timeout
 const thisTabId = Date.now().toString() + Math.random();
-let isThisTabActive = false; // Flag to track if this tab holds the lock
-let sessionCheckInterval = null; // Holds the interval timer
+let isThisTabActive = false;
+let sessionCheckInterval = null;
 
-// Don't clear lock on page load - instead check if it's valid
+// Check for existing lock
 try {
     const existingLock = JSON.parse(localStorage.getItem(LOCK_KEY));
     if (existingLock) {
@@ -428,102 +287,7 @@ try {
 } catch (e) {
     console.warn('Invalid lock data found, clearing');
     localStorage.removeItem(LOCK_KEY);
-
-// *** NEW: ADDED THIS FUNCTION ***
-/**
- * Manually clears the lock from localStorage and reloads the page.
- */
-function forceClearLock(e) {
-  if (e) e.preventDefault(); // Stop link from navigating
-  console.warn('Forcing lock release...');
-  localStorage.removeItem(LOCK_KEY);
-  setTimeout(() => window.location.reload(), 100); // Small delay to ensure lock is cleared
 }
-// *** END NEW FUNCTION ***
-
-function showLockScreen() {
-  document.getElementById('login-overlay').style.display = 'none';
-  document.getElementById('lock-overlay').style.display = 'flex';
-  isThisTabActive = false;
-  isLoggedIn = false;
-  // Stop all polling timers if they exist
-  if (sessionCheckInterval) clearInterval(sessionCheckInterval);
-}
-
-function showLoginScreen() {
-  document.getElementById('lock-overlay').style.display = 'none';
-  document.getElementById('login-overlay').style.display = 'flex';
-}
-
-/**
- * Checks the lock status in localStorage.
- * This runs when the page first loads.
- */
-function checkSessionLock() {
-  try {
-    const lockData = JSON.parse(localStorage.getItem(LOCK_KEY));
-    const now = Date.now();
-    
-    if (!lockData || !lockData.timestamp || !lockData.id) {
-      // No lock exists or invalid lock data
-      localStorage.removeItem(LOCK_KEY); // Ensure clean state
-      showLoginScreen();
-      return;
-    }
-
-    const isStale = (now - lockData.timestamp) > LOCK_TIMEOUT_MS;
-    
-    if (isStale) {
-      // Lock is old or "stale". This tab can take it.
-      console.warn('Found stale lock, clearing it.');
-      localStorage.removeItem(LOCK_KEY);
-      showLoginScreen();
-      return;
-    }
-
-    // Check if this is our own lock
-    if (lockData.id === thisTabId) {
-      isThisTabActive = true;
-      showLoginScreen();
-      return;
-    }
-
-    // Lock is fresh and held by another tab
-    console.log('Session is active elsewhere. Locking this tab.');
-    showLockScreen();
-    
-  } catch (e) {
-    // Error parsing, probably bad data. Clear it and login.
-    console.error('Error checking session lock, clearing.', e);
-    localStorage.removeItem(LOCK_KEY);
-    showLoginScreen();
-  }
-}
-
-/**
- * Listens for changes in other tabs.
- */
-window.addEventListener('storage', (e) => {
-  if (e.key === LOCK_KEY) {
-    if (e.newValue === null) {
-      // The lock was released by the active tab.
-      console.log('Session lock released by another tab. Reloading to enable login.');
-      window.location.reload();
-    } else {
-      // Another tab just took or refreshed the lock.
-      // If it wasn't this tab, lock this one.
-      try {
-        const lockData = JSON.parse(e.newValue);
-        if (lockData && lockData.id !== thisTabId) {
-          console.log('Session taken by another tab. Locking this one.');
-          showLockScreen();
-        }
-      } catch (e) { /* ignore parse error */ }
-    }
-  }
-});
-// --- *** END: localStorage TAB LOCK *** ---
-
 
 const BACKEND_URL = "https://app-788207962975.us-central1.run.app";
 const chatId = document.body.dataset.chatId || "1234";
@@ -532,62 +296,27 @@ const msgInput = document.getElementById("msg");
 const sendBtn = document.getElementById("send-btn");
 const clearBtn = document.getElementById("clear-btn");
 const chatContainer = document.getElementById("chat-container");
-const agentStatus = document.getElementById("agent-status");
+const userStatus = document.getElementById("user-status");
 const uploadBtn = document.getElementById("upload-btn");
 const fileInput = document.getElementById("file-input");
-const emojiBtn = document.getElementById("emoji-btn");
-const emojiPicker = document.getElementById("emoji-picker");
 
 let isLoggedIn = false;
 let sessionToken = null;
-let typingDots = 0;
-let lastMessageCount = 0;
-let lastProcessedMessages = [];
 let replyingTo = null;
-
-// Emoji picker toggle
-emojiBtn.addEventListener("click", (e) => {
-  e.stopPropagation();
-  emojiPicker.classList.toggle("show");
-});
-
-// Close emoji picker when clicking outside
-document.addEventListener("click", (e) => {
-  if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
-    emojiPicker.classList.remove("show");
-  }
-});
-
-// Insert emoji into message
-document.querySelectorAll(".emoji-btn").forEach(btn => {
-  btn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const emoji = btn.dataset.emoji;
-    const cursorPos = msgInput.selectionStart;
-    const textBefore = msgInput.value.substring(0, cursorPos);
-    const textAfter = msgInput.value.substring(cursorPos);
-    msgInput.value = textBefore + emoji + textAfter;
-    msgInput.focus();
-    msgInput.selectionStart = msgInput.selectionEnd = cursorPos + emoji.length;
-    emojiPicker.classList.remove("show");
-    sendTyping(msgInput.value);
-  });
-});
+let lastScrollPos = 0;
+let isManualScroll = false;
 
 async function checkPwd() {
   try {
-    // --- Check lock before logging in ---
-    try {
-      const lockData = JSON.parse(localStorage.getItem(LOCK_KEY));
-      const isStale = !lockData || (Date.now() - lockData.timestamp) > LOCK_TIMEOUT_MS;
-
-      if (lockData && !isStale) {
-        // Another tab is active. Show error.
-        document.getElementById("login-msg").textContent = "Session is active in another tab.";
-        return; // Stop login
+    // Check for existing lock first
+    const existingLock = JSON.parse(localStorage.getItem(LOCK_KEY));
+    if (existingLock && Date.now() - existingLock.timestamp < LOCK_TIMEOUT_MS) {
+      // Check if it's our lock
+      if (existingLock.id !== thisTabId) {
+        document.getElementById("login-msg").textContent = "Session is active in another tab";
+        return;
       }
-    } catch(e) { /* continue */ }
-    // --- End Check ---
+    }
 
     const pwd = document.getElementById("pwd").value;
     if (!pwd) {
@@ -595,136 +324,126 @@ async function checkPwd() {
       return;
     }
 
+    document.getElementById("login-msg").textContent = "Logging in...";
+    
     const res = await fetch(`${BACKEND_URL}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, password: pwd, sender: "user" })
+      body: JSON.stringify({ chat_id: chatId, password: pwd, sender: "agent" })
     });
 
-  const data = await res.json();
-  if (data.success) {
-    // --- Claim this tab as active ---
-    isThisTabActive = true; // This tab now holds the lock
-    const sessionData = { id: thisTabId, timestamp: Date.now() };
-    localStorage.setItem(LOCK_KEY, JSON.stringify(sessionData));
-    // --- End Claim ---
+    const data = await res.json();
+    if (data.success) {
+      // Set the lock before proceeding
+      const lockData = {
+        id: thisTabId,
+        timestamp: Date.now(),
+        lastHeartbeat: Date.now()
+      };
+      localStorage.setItem(LOCK_KEY, JSON.stringify(lockData));
+      isThisTabActive = true;
 
-    sessionToken = data.session_token;
-    document.getElementById("login-overlay").style.display = "none";
-    isLoggedIn = true;
-    startPolling();
-  } else {
-    document.getElementById("login-msg").textContent = data.error || "Login failed";
-    // *** IMPORTANT: Make sure your backend also checks for concurrent logins!
-    // If the backend says "Session already active", show that error.
-    if (data.error === "Session is already active elsewhere.") {
-        showLockScreen();
+      sessionToken = data.session_token;
+      isLoggedIn = true;
+      document.getElementById("login-overlay").style.display = "none";
+      
+      // Clear any existing intervals
+      if (window.chatIntervals) {
+        window.chatIntervals.forEach(clearInterval);
+      }
+      
+      // Add heartbeat interval
+      const heartbeatInterval = setInterval(() => {
+        if (!isThisTabActive || !isLoggedIn) {
+          clearInterval(heartbeatInterval);
+          return;
+        }
+        try {
+          const currentLock = JSON.parse(localStorage.getItem(LOCK_KEY));
+          if (currentLock && currentLock.id === thisTabId) {
+            currentLock.lastHeartbeat = Date.now();
+            localStorage.setItem(LOCK_KEY, JSON.stringify(currentLock));
+          } else {
+            // We lost our lock
+            isThisTabActive = false;
+            isLoggedIn = false;
+            document.getElementById("login-overlay").style.display = "flex";
+            document.getElementById("login-msg").textContent = "Session taken by another tab";
+            if (window.chatIntervals) {
+              window.chatIntervals.forEach(clearInterval);
+            }
+          }
+        } catch (e) {
+          console.error('Error updating heartbeat:', e);
+        }
+      }, 5000);
+      
+      // Start fresh polling
+      startPolling();
+      
+      console.log("Login successful, session started");
+    } else {
+      document.getElementById("login-msg").textContent = data.error || "Login failed";
+      console.error("Login failed:", data.error);
     }
-  }
-} catch (error) {
+  } catch (error) {
     console.error("Login error:", error);
     document.getElementById("login-msg").textContent = "Error connecting to server";
+  }
 }
 
 function startPolling() {
-  // --- Heartbeat to keep the lock alive ---
-  if (sessionCheckInterval) {
-    clearInterval(sessionCheckInterval);
-    sessionCheckInterval = null;
-  }
-  
-  // Initial heartbeat
-  if (isThisTabActive && isLoggedIn) {
-    try {
-      const sessionData = { 
-        id: thisTabId, 
-        timestamp: Date.now(),
-        lastHeartbeat: Date.now() 
-      };
-      localStorage.setItem(LOCK_KEY, JSON.stringify(sessionData));
-    } catch (e) {
-      console.error("Failed to write initial heartbeat", e);
-    }
-  }
-  
-  sessionCheckInterval = setInterval(() => {
-    if (!isThisTabActive || !isLoggedIn) {
-      clearInterval(sessionCheckInterval);
-      sessionCheckInterval = null;
-      return;
-    }
+  // Initial load
+  Promise.all([
+    markOnline(),
+    checkStatus(),
+    loadMessages(),
+    loadTyping()
+  ]).catch(error => console.error("Error during initial load:", error));
 
-    try {
-      // Read current lock data
-      const lockData = JSON.parse(localStorage.getItem(LOCK_KEY));
-      
-      // Only update if this is our lock
-      if (lockData && lockData.id === thisTabId) {
-        const sessionData = { 
-          id: thisTabId, 
-          timestamp: lockData.timestamp, // Keep original timestamp
-          lastHeartbeat: Date.now() 
-        };
-        localStorage.setItem(LOCK_KEY, JSON.stringify(sessionData));
-      } else {
-        // We lost our lock somehow
-        console.warn("Lost lock ownership");
-        isThisTabActive = false;
-        isLoggedIn = false;
-        clearInterval(sessionCheckInterval);
-        sessionCheckInterval = null;
-        showLockScreen();
+  // Set up polling intervals
+  const intervals = [
+    setInterval(() => {
+      if (isLoggedIn && sessionToken) loadMessages().catch(console.error);
+    }, 1000),
+    setInterval(() => {
+      if (isLoggedIn && sessionToken) checkStatus().catch(console.error);
+    }, 1000),
+    setInterval(() => {
+      if (isLoggedIn && sessionToken) loadTyping().catch(console.error);
+    }, 500),
+    setInterval(() => {
+      if (isLoggedIn && sessionToken && document.visibilityState === "visible") {
+        markOnline().catch(console.error);
       }
-    } catch (e) {
-      console.error("Failed to write heartbeat, stopping.", e);
-      isThisTabActive = false;
-      isLoggedIn = false;
-      clearInterval(sessionCheckInterval);
-      sessionCheckInterval = null;
-      showLockScreen();
-    }
-  }, 2000); // Refresh lock every 2 seconds
-  // --- End Heartbeat ---
+    }, 2000)
+  ];
 
-  markOnline();
-  checkStatus();
-  loadMessages();
-  loadTyping();
-  
-  // Consolidating your intervals
-  setInterval(() => {
-    if (!isLoggedIn || !isThisTabActive) return; // Stop polling if not active
-    loadMessages();
-    checkStatus();
-  }, 1000);
-
-  setInterval(() => {
-    if (!isLoggedIn || !isThisTabActive) return;
-    loadTyping();
-  }, 500);
-  
-  setInterval(() => {
-    if (document.visibilityState === "visible" && isLoggedIn && isThisTabActive) {
-        markOnline();
-    }
-  }, 2000);
+  // Store intervals for cleanup
+  window.chatIntervals = intervals;
 }
 
 async function sendMessage() {
-  try {
-    const text = msgInput.value.trim();
-    if (!text) {
-      console.log("No text to send");
-      return;
-    }
-    if (!isLoggedIn || !sessionToken || !isThisTabActive) {
-      console.log("Not properly logged in or tab not active");
-      return;
-    }
+  const text = msgInput.value.trim();
+  
+  // Add validation checks
+  if (!text) {
+    console.log("No text to send");
+    return;
+  }
+  if (!isLoggedIn) {
+    console.log("Not logged in");
+    return;
+  }
+  if (!sessionToken) {
+    console.log("No session token");
+    return;
+  }
 
+  try {
     const messageData = { 
       chat_id: chatId, 
-      sender: "user", 
+      sender: "agent", 
       text 
     };
 
@@ -737,7 +456,7 @@ async function sendMessage() {
     }
 
     console.log("Sending message:", messageData);
-
+    
     const response = await fetch(`${BACKEND_URL}/send`, {
       method: "POST",
       headers: {
@@ -748,8 +467,10 @@ async function sendMessage() {
     });
 
     if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Failed to send message:", errorData);
       if (response.status === 403) {
-        // Session expired
+        // Token expired or invalid, trigger re-login
         isLoggedIn = false;
         sessionToken = null;
         document.getElementById("login-overlay").style.display = "flex";
@@ -758,10 +479,13 @@ async function sendMessage() {
       throw new Error(`Failed to send message: ${response.status}`);
     }
 
-    console.log("Message sent successfully");
+    const result = await response.json();
+    console.log("Message sent successfully:", result);
+    
     msgInput.value = "";
     await sendTyping("");
     await loadMessages();
+
   } catch (error) {
     console.error("Error sending message:", error);
     alert("Failed to send message. Please try again.");
@@ -773,7 +497,7 @@ async function sendMessage() {
 }
 
 async function addReaction(messageId, reaction) {
-  if (!isLoggedIn || !sessionToken || !isThisTabActive) return;
+  if (!isLoggedIn || !sessionToken) return;
 
   await fetch(`${BACKEND_URL}/react`, {
     method: "POST",
@@ -785,7 +509,7 @@ async function addReaction(messageId, reaction) {
       chat_id: chatId,
       message_id: messageId,
       reaction: reaction,
-      user_id: "user"
+      user_id: "agent"
     })
   });
   
@@ -793,7 +517,7 @@ async function addReaction(messageId, reaction) {
 }
 
 async function deleteMessage(messageId) {
-  if (!isLoggedIn || !sessionToken || !isThisTabActive) return;
+  if (!isLoggedIn || !sessionToken) return;
   if (!confirm("Are you sure you want to delete this message?")) return;
 
   await fetch(`${BACKEND_URL}/delete_message`, {
@@ -805,7 +529,7 @@ async function deleteMessage(messageId) {
     body: JSON.stringify({
       chat_id: chatId,
       message_id: messageId,
-      user_id: "user"
+      user_id: "agent"
     })
   });
   
@@ -813,10 +537,11 @@ async function deleteMessage(messageId) {
 }
 
 async function loadMessages() {
-  if (!isLoggedIn || !isThisTabActive || !sessionToken) return;
   try {
+    if (!isLoggedIn || !sessionToken) return;
     const isTabActive = document.visibilityState === "visible";
-    const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=user&active=${isTabActive}`, {
+    
+    const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=agent&active=${isTabActive}`, {
       headers: {
         "Authorization": `Bearer ${sessionToken}`
       }
@@ -824,7 +549,7 @@ async function loadMessages() {
     
     if (!res.ok) {
       if (res.status === 403) {
-        // Session expired
+        // Token expired or invalid
         isLoggedIn = false;
         sessionToken = null;
         document.getElementById("login-overlay").style.display = "flex";
@@ -832,39 +557,14 @@ async function loadMessages() {
       }
       throw new Error(`Failed to load messages: ${res.status}`);
     }
-  const data = await res.json();
+    
+    const data = await res.json();
   
-  // If we have new messages and the window is not active, show the unread badge
-  if (!isTabActive && data.length > lastMessageCount) {
-    const badge = document.createElement("div");
-    badge.className = "unread-badge";
-    badge.textContent = `${data.length - lastMessageCount} new messages`;
-    document.body.appendChild(badge);
-  }
+  // Store current scroll position
+  lastScrollPos = chatContainer.scrollTop;
+  isManualScroll = lastScrollPos < chatContainer.scrollHeight - chatContainer.clientHeight - 10;
   
   chatContainer.innerHTML = "";
-
-  const currentMessageIds = data.map((m, i) => `${m.sender}-${m.text}-${i}`);
-  const newMessages = data.filter((m, i) => {
-    const msgId = `${m.sender}-${m.text}-${i}`;
-    return !lastProcessedMessages.includes(msgId);
-  });
-
-  const newLoveMessage = newMessages.some(m => m.text && /\blove\b/i.test(m.text));
-  const newGoodnightMessage = newMessages.some(m => 
-    m.text && /\b(goodnight|gn|gnsd|gntc|gnsdtc)\b/i.test(m.text)
-  );
-  
-  if (newLoveMessage) {
-    spawnLoveBubbles();
-  }
-  
-  if (newGoodnightMessage) {
-    spawnSleepBubbles();
-  }
-
-  lastProcessedMessages = currentMessageIds;
-
   data.forEach((m, i) => {
     const d = document.createElement("div");
     d.className = "message " + (m.sender === "user" ? "user-msg" : "agent-msg");
@@ -892,7 +592,7 @@ async function loadMessages() {
       const download = document.createElement("a");
       download.href = m.url;
       download.download = "image.jpg";
-      download.textContent = "📥";
+      download.textContent = "⬇️";
       download.style.fontSize = "14px";
       download.style.textDecoration = "none";
       download.style.color = "#555";
@@ -928,26 +628,14 @@ async function loadMessages() {
     });
     d.appendChild(reactionsDiv);
 
-    // Add message options (reply, react, delete, edit)
+    // Add message options (reply, react, delete)
     const options = document.createElement("div");
     options.className = "options";
-
-    // Close any other open options first
-    d.onclick = (e) => {
-      e.stopPropagation();
-      // Hide all other options
-      document.querySelectorAll('.options.show').forEach(opt => {
-        if (opt !== options) opt.classList.remove('show');
-      });
-      options.classList.toggle('show');
-    };
 
     const replyBtn = document.createElement("button");
     replyBtn.className = "option-btn";
     replyBtn.textContent = "↩️";
-    replyBtn.title = "Reply";
-    replyBtn.onclick = (e) => {
-      e.stopPropagation();
+    replyBtn.onclick = () => {
       replyingTo = m.id;
       msgInput.focus();
       // Show reply indicator
@@ -965,127 +653,74 @@ async function loadMessages() {
       };
       replyIndicator.appendChild(cancelBtn);
       document.getElementById("input-container").insertBefore(replyIndicator, msgInput);
-      options.classList.remove('show');
     };
     options.appendChild(replyBtn);
 
     const reactBtn = document.createElement("button");
     reactBtn.className = "option-btn";
     reactBtn.textContent = "😊";
-    reactBtn.title = "React";
     reactBtn.onclick = (e) => {
       e.stopPropagation();
-      const picker = document.getElementById("emoji-picker").cloneNode(true);
+      const picker = document.createElement("div");
+      picker.className = "emoji-picker";
+      picker.innerHTML = `
+        <div class="emoji-grid">
+          <button class="emoji-btn" data-emoji="😊">😊</button>
+          <button class="emoji-btn" data-emoji="😂">😂</button>
+          <button class="emoji-btn" data-emoji="🤣">🤣</button>
+          <button class="emoji-btn" data-emoji="🥰">🥰</button>
+          <button class="emoji-btn" data-emoji="❤️">❤️</button>
+          <button class="emoji-btn" data-emoji="👍">👍</button>
+          <button class="emoji-btn" data-emoji="👋">👋</button>
+          <button class="emoji-btn" data-emoji="🙏">🙏</button>
+        </div>
+      `;
       picker.style.display = "block";
       picker.style.position = "absolute";
       picker.style.bottom = "100%";
       picker.style.right = "0";
       options.appendChild(picker);
+      
       picker.querySelectorAll(".emoji-btn").forEach(btn => {
         btn.onclick = (e) => {
           e.stopPropagation();
           addReaction(m.id, btn.dataset.emoji);
           picker.remove();
-          options.classList.remove('show');
         };
       });
       document.addEventListener("click", () => picker.remove(), { once: true });
     };
     options.appendChild(reactBtn);
 
-    if (m.sender === "user") {
-      // Edit button for user's own messages
-      const editBtn = document.createElement("button");
-      editBtn.className = "option-btn";
-      editBtn.textContent = "✏️";
-      editBtn.title = "Edit";
-      editBtn.onclick = (e) => {
-        e.stopPropagation();
-        const textContent = d.querySelector('.message-text');
-        if (!textContent) return;
-        
-        const originalText = m.text || "";
-        const editInput = document.createElement("textarea");
-        editInput.value = originalText;
-        editInput.style.width = "100%";
-        editInput.style.marginBottom = "8px";
-        editInput.style.padding = "8px";
-        editInput.style.borderRadius = "8px";
-        
-        const saveBtn = document.createElement("button");
-        saveBtn.textContent = "Save";
-        saveBtn.onclick = async () => {
-          const newText = editInput.value.trim();
-          if (newText && newText !== originalText) {
-            try {
-              const response = await fetch(`${BACKEND_URL}/edit_message`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${sessionToken}`
-                },
-                body: JSON.stringify({
-                  chat_id: chatId,
-                  message_id: m.id,
-                  text: newText
-                })
-              });
-              
-              if (response.ok) {
-                textContent.textContent = newText;
-                m.text = newText;
-              }
-            } catch (error) {
-              console.error("Error editing message:", error);
-            }
-          }
-          textContent.style.display = "block";
-          editInput.remove();
-          saveBtn.remove();
-          options.classList.remove('show');
-        };
-        
-        textContent.style.display = "none";
-        textContent.parentNode.insertBefore(editInput, textContent);
-        textContent.parentNode.insertBefore(saveBtn, textContent);
-        editInput.focus();
-      };
-      options.appendChild(editBtn);
-
+    if (m.sender === "agent") {
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "option-btn";
       deleteBtn.textContent = "🗑️";
-      deleteBtn.title = "Delete";
-      deleteBtn.onclick = (e) => {
-        e.stopPropagation();
-        if (confirm("Are you sure you want to delete this message?")) {
-          deleteMessage(m.id);
-          options.classList.remove('show');
-        }
-      };
+      deleteBtn.onclick = () => deleteMessage(m.id);
       options.appendChild(deleteBtn);
     }
 
     d.appendChild(options);
 
     const isLast = i === data.length - 1;
-    if (m.sender === "user" && m.seen_by === "agent" && isLast) {
+    if (m.sender === "agent" && m.seen_by === "user" && isLast) {
       const seenTag = document.createElement("div");
       seenTag.style.fontSize = "12px";
       seenTag.style.color = "#888";
       seenTag.style.marginTop = "4px";
-      seenTag.textContent = "✓";
+      seenTag.textContent = "Seen ✅";
       d.appendChild(seenTag);
     }
 
     chatContainer.appendChild(d);
   });
 
-  if (data.length > lastMessageCount) {
-    lastMessageCount = data.length;
+  // Smart scrolling behavior
+  if (!isManualScroll) {
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  } else {
+    chatContainer.scrollTop = lastScrollPos;
   }
-
-  chatContainer.scrollTop = chatContainer.scrollHeight;
   } catch (error) {
     console.error("Error loading messages:", error);
   }
@@ -1093,9 +728,13 @@ async function loadMessages() {
 
 async function loadTyping() {
   try {
-    if (!isLoggedIn || !isThisTabActive) return;
-    const res = await fetch(`${BACKEND_URL}/get_live_typing/${chatId}`);
-    
+    if (!isLoggedIn || !sessionToken) return;
+    const res = await fetch(`${BACKEND_URL}/get_live_typing/${chatId}`, {
+      headers: {
+        "Authorization": `Bearer ${sessionToken}`
+      }
+    });
+
     if (!res.ok) {
       if (res.status === 403) {
         // Session expired
@@ -1109,16 +748,14 @@ async function loadTyping() {
 
     const d = await res.json();
 
-    const oldTyping = document.getElementById("agent-typing-indicator");
+    const oldTyping = document.getElementById("user-typing-indicator");
     if (oldTyping) oldTyping.remove();
 
-    if (d.sender === "agent" && d.text) {
-      typingDots = (typingDots + 1) % 4;
-      const dots = ".".repeat(typingDots);
+    if (d.sender === "user" && d.text) {
       const typingMsg = document.createElement("div");
-      typingMsg.id = "agent-typing-indicator";
-      typingMsg.className = "message agent-msg";
-      typingMsg.textContent = `Typing${dots}`;
+      typingMsg.id = "user-typing-indicator";
+      typingMsg.className = "message user-msg";
+      typingMsg.innerHTML = d.text.replace(/\n/g, "<br>");
       chatContainer.appendChild(typingMsg);
       chatContainer.scrollTop = chatContainer.scrollHeight;
     }
@@ -1129,14 +766,14 @@ async function loadTyping() {
 
 async function sendTyping(text) {
   try {
-    if (!isLoggedIn || !isThisTabActive) return;
+    if (!isLoggedIn || !sessionToken) return;
     const response = await fetch(`${BACKEND_URL}/live_typing`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${sessionToken}`
       },
-      body: JSON.stringify({ chat_id: chatId, sender: "user", text })
+      body: JSON.stringify({ chat_id: chatId, sender: "agent", text })
     });
 
     if (!response.ok) {
@@ -1155,24 +792,24 @@ async function sendTyping(text) {
 }
 
 async function checkStatus() {
-  if (!isLoggedIn || !isThisTabActive) return;
+  if (!isLoggedIn) return;
   const res = await fetch(`${BACKEND_URL}/is_online/${chatId}?t=${Date.now()}`);
   const d = await res.json();
-  const emoji = d.agent_online ? "🟢" : "🔴";
-  const time = d.agent_online ? "" : ` ${d.agent_last_seen}`;
-  agentStatus.textContent = `${emoji}${time}`;
+  const emoji = d.user_online ? "🟢" : "🔴";
+  const time = d.user_online ? "" : `${d.user_last_seen}`;
+  userStatus.textContent = `${emoji}${time}`;
 }
 
 async function clearChat() {
   try {
-    if (!isLoggedIn || !isThisTabActive) return;
+    if (!isLoggedIn || !sessionToken) return;
     const response = await fetch(`${BACKEND_URL}/clear_chat/${chatId}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${sessionToken}`
       },
-      body: JSON.stringify({ sender: "user" })
+      body: JSON.stringify({ sender: "agent" })
     });
 
     if (!response.ok) {
@@ -1187,8 +824,6 @@ async function clearChat() {
     }
 
     chatContainer.innerHTML = "";
-    lastMessageCount = 0;
-    lastProcessedMessages = [];
   } catch (error) {
     console.error("Error clearing chat:", error);
     alert("Failed to clear chat. Please try again.");
@@ -1197,14 +832,14 @@ async function clearChat() {
 
 async function markOnline() {
   try {
-    if (!isLoggedIn || !isThisTabActive) return;
+    if (!isLoggedIn || !sessionToken) return;
     const response = await fetch(`${BACKEND_URL}/mark_online`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${sessionToken}`
       },
-      body: JSON.stringify({ chat_id: chatId, sender: "user" })
+      body: JSON.stringify({ chat_id: chatId, sender: "agent" })
     });
 
     if (!response.ok) {
@@ -1222,31 +857,100 @@ async function markOnline() {
   }
 }
 
-uploadBtn.addEventListener("click", () => fileInput.click());
+uploadBtn.addEventListener("click", () => {
+  if (!isLoggedIn || !sessionToken || !isThisTabActive) {
+    alert("Please ensure you are logged in before uploading files.");
+    return;
+  }
+  fileInput.click();
+});
 
 fileInput.addEventListener("change", async () => {
   const file = fileInput.files[0];
   if (!file || !isLoggedIn || !sessionToken || !isThisTabActive) return;
 
-  const reader = new FileReader();
-  reader.onload = async () => {
-    const base64 = reader.result;
-    await fetch(`${BACKEND_URL}/send`, {
-      method: "POST",
+  // Validate file size (max 5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    alert("File size too large. Please upload images under 5MB.");
+    fileInput.value = '';
+    return;
+  }
+
+  // Validate file type
+  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+  if (!validTypes.includes(file.type)) {
+    alert("Please upload only JPG, PNG or GIF images.");
+    fileInput.value = '';
+    return;
+  }
+
+  try {
+    const progressDiv = document.createElement('div');
+    progressDiv.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      z-index: 1000;
+    `;
+    progressDiv.textContent = 'Uploading image...';
+    document.body.appendChild(progressDiv);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('chat_id', chatId);
+    formData.append('sender', 'agent');
+
+    // First, upload the file
+    const uploadResponse = await fetch(`${BACKEND_URL}/upload`, {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${sessionToken}`
+        'Authorization': `Bearer ${sessionToken}`
+      },
+      body: formData
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error(`Upload failed: ${uploadResponse.status}`);
+    }
+
+    const uploadResult = await uploadResponse.json();
+    if (!uploadResult.success) {
+      throw new Error(uploadResult.error || 'Upload failed');
+    }
+
+    // Then send the message with the URL
+    const messageResponse = await fetch(`${BACKEND_URL}/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${sessionToken}`
       },
       body: JSON.stringify({
         chat_id: chatId,
-        sender: "user",
-        type: "image",
-        url: base64
+        sender: 'agent',
+        type: 'image',
+        url: uploadResult.url
       })
     });
+
+    if (!messageResponse.ok) {
+      throw new Error(`Failed to send message: ${messageResponse.status}`);
+    }
+
+    fileInput.value = '';
     loadMessages();
-  };
-  reader.readAsDataURL(file);
+    progressDiv.remove();
+  } catch (error) {
+    console.error('Upload error:', error);
+    alert(`Failed to upload image: ${error.message}`);
+    const progressDiv = document.querySelector('div[style*="position: fixed"]');
+    if (progressDiv) progressDiv.remove();
+  }
 });
 
 sendBtn.addEventListener("mousedown", e => e.preventDefault());
@@ -1254,76 +958,40 @@ sendBtn.addEventListener("click", sendMessage);
 clearBtn.addEventListener("click", clearChat);
 msgInput.addEventListener("input", e => sendTyping(e.target.value));
 
+// Add scroll event listener to detect manual scrolling
+chatContainer.addEventListener('scroll', () => {
+  isManualScroll = chatContainer.scrollTop < chatContainer.scrollHeight - chatContainer.clientHeight - 10;
+});
+
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
-    // When tab becomes visible, re-check the lock
-    checkSessionLock();
-    if (isLoggedIn) {
-        markOnline();
-        loadMessages();
-    }
+    markOnline();
+    loadMessages();
   }
 });
 
 window.addEventListener("beforeunload", () => {
-  // --- Release lock if this tab is the active one ---
+  // Release lock if this is our tab
   if (isThisTabActive) {
-    // This is a synchronous operation, it's safe here
-    localStorage.removeItem(LOCK_KEY);
+    try {
+      const currentLock = JSON.parse(localStorage.getItem(LOCK_KEY));
+      if (currentLock && currentLock.id === thisTabId) {
+        localStorage.removeItem(LOCK_KEY);
+      }
+    } catch (e) {
+      console.warn('Error clearing lock:', e);
+    }
   }
-  // --- End Release ---
 
   try {
-    const data = JSON.stringify({ chat_id: chatId, sender: "user" });
+    const data = JSON.stringify({ chat_id: chatId, sender: "agent" });
     const blob = new Blob([data], { type: "application/json" });
-    navigator.sendBeacon(`${BACKEND_URL}/logout_user`, blob);
+    navigator.sendBeacon(`${BACKEND_URL}/logout_agent`, blob);
   } catch (e) {
     console.warn("Logout beacon failed:", e);
   }
 });
-
-function spawnLoveBubbles() {
-  for (let i = 0; i < 2; i++) {
-    setTimeout(() => {
-      const bubble = document.createElement("div");
-      bubble.className = "bubble";
-      bubble.textContent = "💖";
-      bubble.style.left = `${20 + Math.random() * 60}%`;
-      document.body.appendChild(bubble);
-      setTimeout(() => bubble.remove(), 3000);
-    }, i * 200);
-  }
-}
-
-function spawnSleepBubbles() {
-  const txt = document.createElement("div");
-  txt.textContent = "GN 😴 SD";
-  txt.style.position = "fixed";
-  txt.style.bottom = "120px";  // Just above the input box
-  txt.style.left = "50%";
-  txt.style.transform = "translateX(-50%)";  // Only horizontal centering
-  txt.style.fontSize = "60px";
-  txt.style.color = "#d62976";  // Dark pink color
-  txt.style.fontWeight = "bold";
-  txt.style.pointerEvents = "none";
-  txt.style.zIndex = "150";
-  txt.style.textShadow = "2px 2px 4px rgba(0,0,0,0.3)";
-  txt.style.whiteSpace = "nowrap";
-  
-  // Animation that keeps it centered horizontally
-  txt.style.animation = "gnReshmaFade 4s ease-in-out forwards";
-  
-  document.body.appendChild(txt);
-  
-  setTimeout(() => txt.remove(), 4000);
-}
-
-// --- Run the lock check on page load ---
-document.addEventListener('DOMContentLoaded', () => {
-    checkSessionLock();
-});
 </script>
 </body>
 </html>
-
-
+  
