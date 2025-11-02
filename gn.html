@@ -280,65 +280,149 @@ const fileInput = document.getElementById("file-input");
 
 let isLoggedIn = false;
 let sessionToken = null;
+let replyingTo = null;
+let lastScrollPos = 0;
+let isManualScroll = false;
 
 async function checkPwd() {
-  const pwd = document.getElementById("pwd").value;
-  const res = await fetch(`${BACKEND_URL}/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, password: pwd, sender: "agent" })
-  });
+  try {
+    const pwd = document.getElementById("pwd").value;
+    if (!pwd) {
+      document.getElementById("login-msg").textContent = "Please enter password";
+      return;
+    }
 
-  const data = await res.json();
-  if (data.success) {
-    sessionToken = data.session_token;
-    document.getElementById("login-overlay").style.display = "none";
-    isLoggedIn = true;
-    startPolling();
-  } else {
-    document.getElementById("login-msg").textContent = data.error || "Login failed";
+    document.getElementById("login-msg").textContent = "Logging in...";
+    
+    const res = await fetch(`${BACKEND_URL}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, password: pwd, sender: "agent" })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      sessionToken = data.session_token;
+      isLoggedIn = true;
+      document.getElementById("login-overlay").style.display = "none";
+      
+      // Clear any existing intervals
+      if (window.chatIntervals) {
+        window.chatIntervals.forEach(clearInterval);
+      }
+      
+      // Start fresh polling
+      startPolling();
+      
+      console.log("Login successful, session started");
+    } else {
+      document.getElementById("login-msg").textContent = data.error || "Login failed";
+      console.error("Login failed:", data.error);
+    }
+  } catch (error) {
+    console.error("Login error:", error);
+    document.getElementById("login-msg").textContent = "Error connecting to server";
   }
 }
 
 function startPolling() {
-  markOnline();
-  checkStatus();
-  loadMessages();
-  loadTyping();
-  setInterval(loadMessages, 1000);
-  setInterval(checkStatus, 1000);
-  setInterval(loadTyping, 500);
-  setInterval(() => {
-    if (document.visibilityState === "visible") markOnline();
-  }, 2000);
+  // Initial load
+  Promise.all([
+    markOnline(),
+    checkStatus(),
+    loadMessages(),
+    loadTyping()
+  ]).catch(error => console.error("Error during initial load:", error));
+
+  // Set up polling intervals
+  const intervals = [
+    setInterval(() => {
+      if (isLoggedIn && sessionToken) loadMessages().catch(console.error);
+    }, 1000),
+    setInterval(() => {
+      if (isLoggedIn && sessionToken) checkStatus().catch(console.error);
+    }, 1000),
+    setInterval(() => {
+      if (isLoggedIn && sessionToken) loadTyping().catch(console.error);
+    }, 500),
+    setInterval(() => {
+      if (isLoggedIn && sessionToken && document.visibilityState === "visible") {
+        markOnline().catch(console.error);
+      }
+    }, 2000)
+  ];
+
+  // Store intervals for cleanup
+  window.chatIntervals = intervals;
 }
 
 async function sendMessage() {
   const text = msgInput.value.trim();
-  if (!text || !isLoggedIn || !sessionToken) return;
-
-  const messageData = { 
-    chat_id: chatId, 
-    sender: "agent", 
-    text 
-  };
-
-  // Add reply-to if replying to a message
-  if (replyingTo) {
-    messageData.reply_to = replyingTo;
-    replyingTo = null;
-    const indicator = document.getElementById("reply-indicator");
-    if (indicator) indicator.remove();
+  
+  // Add validation checks
+  if (!text) {
+    console.log("No text to send");
+    return;
+  }
+  if (!isLoggedIn) {
+    console.log("Not logged in");
+    return;
+  }
+  if (!sessionToken) {
+    console.log("No session token");
+    return;
   }
 
-  await fetch(`${BACKEND_URL}/send`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
-    },
-    body: JSON.stringify(messageData)
-  });
+  try {
+    const messageData = { 
+      chat_id: chatId, 
+      sender: "agent", 
+      text 
+    };
+
+    // Add reply-to if replying to a message
+    if (replyingTo) {
+      messageData.reply_to = replyingTo;
+      replyingTo = null;
+      const indicator = document.getElementById("reply-indicator");
+      if (indicator) indicator.remove();
+    }
+
+    console.log("Sending message:", messageData);
+    
+    const response = await fetch(`${BACKEND_URL}/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${sessionToken}`
+      },
+      body: JSON.stringify(messageData)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Failed to send message:", errorData);
+      if (response.status === 403) {
+        // Token expired or invalid, trigger re-login
+        isLoggedIn = false;
+        sessionToken = null;
+        document.getElementById("login-overlay").style.display = "flex";
+        return;
+      }
+      throw new Error(`Failed to send message: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("Message sent successfully:", result);
+    
+    msgInput.value = "";
+    await sendTyping("");
+    await loadMessages();
+
+  } catch (error) {
+    console.error("Error sending message:", error);
+    alert("Failed to send message. Please try again.");
+  }
 
   msgInput.value = "";
   await sendTyping("");
@@ -386,13 +470,34 @@ async function deleteMessage(messageId) {
 }
 
 async function loadMessages() {
-  if (!isLoggedIn) return;
-  const isTabActive = document.visibilityState === "visible";
-  const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=agent&active=${isTabActive}`);
-  const data = await res.json();
+  try {
+    if (!isLoggedIn || !sessionToken) return;
+    const isTabActive = document.visibilityState === "visible";
+    
+    const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=agent&active=${isTabActive}`, {
+      headers: {
+        "Authorization": `Bearer ${sessionToken}`
+      }
+    });
+    
+    if (!res.ok) {
+      if (res.status === 403) {
+        // Token expired or invalid
+        isLoggedIn = false;
+        sessionToken = null;
+        document.getElementById("login-overlay").style.display = "flex";
+        return;
+      }
+      throw new Error(`Failed to load messages: ${res.status}`);
+    }
+    
+    const data = await res.json();
+  
+  // Store current scroll position
+  lastScrollPos = chatContainer.scrollTop;
+  isManualScroll = lastScrollPos < chatContainer.scrollHeight - chatContainer.clientHeight - 10;
+  
   chatContainer.innerHTML = "";
-
-  let replyingTo = null;
   data.forEach((m, i) => {
     const d = document.createElement("div");
     d.className = "message " + (m.sender === "user" ? "user-msg" : "agent-msg");
@@ -536,37 +641,77 @@ async function loadMessages() {
     chatContainer.appendChild(d);
   });
 
-  chatContainer.scrollTop = chatContainer.scrollHeight;
+  // Smart scrolling behavior
+  if (!isManualScroll) {
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  } else {
+    chatContainer.scrollTop = lastScrollPos;
+  }
 }
 
 async function loadTyping() {
-  if (!isLoggedIn) return;
-  const res = await fetch(`${BACKEND_URL}/get_live_typing/${chatId}`);
-  const d = await res.json();
+  try {
+    if (!isLoggedIn || !sessionToken) return;
+    const res = await fetch(`${BACKEND_URL}/get_live_typing/${chatId}`, {
+      headers: {
+        "Authorization": `Bearer ${sessionToken}`
+      }
+    });
 
-  const oldTyping = document.getElementById("user-typing-indicator");
-  if (oldTyping) oldTyping.remove();
+    if (!res.ok) {
+      if (res.status === 403) {
+        // Session expired
+        isLoggedIn = false;
+        sessionToken = null;
+        document.getElementById("login-overlay").style.display = "flex";
+        return;
+      }
+      throw new Error(`Failed to load typing status: ${res.status}`);
+    }
 
-  if (d.sender === "user" && d.text) {
-    const typingMsg = document.createElement("div");
-    typingMsg.id = "user-typing-indicator";
-    typingMsg.className = "message user-msg";
-    typingMsg.innerHTML = d.text.replace(/\n/g, "<br>");
-    chatContainer.appendChild(typingMsg);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+    const d = await res.json();
+
+    const oldTyping = document.getElementById("user-typing-indicator");
+    if (oldTyping) oldTyping.remove();
+
+    if (d.sender === "user" && d.text) {
+      const typingMsg = document.createElement("div");
+      typingMsg.id = "user-typing-indicator";
+      typingMsg.className = "message user-msg";
+      typingMsg.innerHTML = d.text.replace(/\n/g, "<br>");
+      chatContainer.appendChild(typingMsg);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+  } catch (error) {
+    console.error("Error loading typing status:", error);
   }
 }
 
 async function sendTyping(text) {
-  if (!isLoggedIn) return;
-  await fetch(`${BACKEND_URL}/live_typing`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
-    },
-    body: JSON.stringify({ chat_id: chatId, sender: "agent", text })
-  });
+  try {
+    if (!isLoggedIn || !sessionToken) return;
+    const response = await fetch(`${BACKEND_URL}/live_typing`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${sessionToken}`
+      },
+      body: JSON.stringify({ chat_id: chatId, sender: "agent", text })
+    });
+
+    if (!response.ok) {
+      if (response.status === 403) {
+        // Session expired
+        isLoggedIn = false;
+        sessionToken = null;
+        document.getElementById("login-overlay").style.display = "flex";
+        return;
+      }
+      throw new Error(`Failed to send typing status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error("Error sending typing status:", error);
+  }
 }
 
 async function checkStatus() {
@@ -579,28 +724,60 @@ async function checkStatus() {
 }
 
 async function clearChat() {
-  if (!isLoggedIn) return;
-  await fetch(`${BACKEND_URL}/clear_chat/${chatId}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
-    },
-    body: JSON.stringify({ sender: "agent" })
-  });
-  chatContainer.innerHTML = "";
+  try {
+    if (!isLoggedIn || !sessionToken) return;
+    const response = await fetch(`${BACKEND_URL}/clear_chat/${chatId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${sessionToken}`
+      },
+      body: JSON.stringify({ sender: "agent" })
+    });
+
+    if (!response.ok) {
+      if (response.status === 403) {
+        // Session expired
+        isLoggedIn = false;
+        sessionToken = null;
+        document.getElementById("login-overlay").style.display = "flex";
+        return;
+      }
+      throw new Error(`Failed to clear chat: ${response.status}`);
+    }
+
+    chatContainer.innerHTML = "";
+  } catch (error) {
+    console.error("Error clearing chat:", error);
+    alert("Failed to clear chat. Please try again.");
+  }
 }
 
 async function markOnline() {
-  if (!isLoggedIn) return;
-  await fetch(`${BACKEND_URL}/mark_online`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
-    },
-    body: JSON.stringify({ chat_id: chatId, sender: "agent" })
-  });
+  try {
+    if (!isLoggedIn || !sessionToken) return;
+    const response = await fetch(`${BACKEND_URL}/mark_online`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${sessionToken}`
+      },
+      body: JSON.stringify({ chat_id: chatId, sender: "agent" })
+    });
+
+    if (!response.ok) {
+      if (response.status === 403) {
+        // Session expired
+        isLoggedIn = false;
+        sessionToken = null;
+        document.getElementById("login-overlay").style.display = "flex";
+        return;
+      }
+      throw new Error(`Failed to mark online: ${response.status}`);
+    }
+  } catch (error) {
+    console.error("Error marking online:", error);
+  }
 }
 
 uploadBtn.addEventListener("click", () => fileInput.click());
@@ -635,6 +812,11 @@ sendBtn.addEventListener("click", sendMessage);
 clearBtn.addEventListener("click", clearChat);
 msgInput.addEventListener("input", e => sendTyping(e.target.value));
 
+// Add scroll event listener to detect manual scrolling
+chatContainer.addEventListener('scroll', () => {
+  isManualScroll = chatContainer.scrollTop < chatContainer.scrollHeight - chatContainer.clientHeight - 10;
+});
+
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     markOnline();
@@ -654,3 +836,4 @@ window.addEventListener("beforeunload", () => {
 </script>
 </body>
 </html>
+  
