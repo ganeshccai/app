@@ -469,6 +469,7 @@ document.querySelectorAll(".emoji-btn").forEach(btn => {
 });
 
 async function checkPwd() {
+  console.log('Starting login process...');
   // --- Check lock before logging in ---
   try {
     const lockData = JSON.parse(localStorage.getItem(LOCK_KEY));
@@ -479,34 +480,64 @@ async function checkPwd() {
       document.getElementById("login-msg").textContent = "Session is active in another tab.";
       return; // Stop login
     }
-  } catch(e) { /* continue */ }
+  } catch(e) { 
+    console.warn('Lock check error:', e);
+  }
   // --- End Check ---
 
   const pwd = document.getElementById("pwd").value;
-  const res = await fetch(`${BACKEND_URL}/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, password: pwd, sender: "user" })
-  });
+  if (!pwd) {
+    document.getElementById("login-msg").textContent = "Please enter a password";
+    return;
+  }
 
-  const data = await res.json();
-  if (data.success) {
-    // --- Claim this tab as active ---
-    isThisTabActive = true; // This tab now holds the lock
-    const sessionData = { id: thisTabId, timestamp: Date.now() };
-    localStorage.setItem(LOCK_KEY, JSON.stringify(sessionData));
-    // --- End Claim ---
+  try {
+    console.log('Sending login request...');
+    const res = await fetch(`${BACKEND_URL}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, password: pwd, sender: "user" })
+    });
 
-    sessionToken = data.session_token;
-    document.getElementById("login-overlay").style.display = "none";
-    isLoggedIn = true;
-    startPolling();
-  } else {
-    document.getElementById("login-msg").textContent = data.error || "Login failed";
-    // *** IMPORTANT: Make sure your backend also checks for concurrent logins!
-    // If the backend says "Session already active", show that error.
-    if (data.error === "Session is already active elsewhere.") {
-        showLockScreen();
+    console.log('Login response status:', res.status);
+    const data = await res.json();
+    console.log('Login response:', data);
+
+    if (data.success && data.session_token) {
+      // --- Claim this tab as active ---
+      isThisTabActive = true; // This tab now holds the lock
+      const sessionData = { id: thisTabId, timestamp: Date.now() };
+      localStorage.setItem(LOCK_KEY, JSON.stringify(sessionData));
+      // --- End Claim ---
+
+      sessionToken = data.session_token;
+      document.getElementById("login-overlay").style.display = "none";
+      isLoggedIn = true;
+      
+      // Clear any previous error message
+      document.getElementById("login-msg").textContent = "";
+      
+      // Store the token in sessionStorage as backup
+      try {
+        sessionStorage.setItem('regal_session_token', sessionToken);
+      } catch (e) {
+        console.warn('Failed to store token in sessionStorage:', e);
+      }
+      
+      console.log('Login successful, starting polling...');
+      startPolling();
+      
+      // Load messages immediately
+      loadMessages();
+    } else {
+      throw new Error(data.error || "Login failed");
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    document.getElementById("login-msg").textContent = error.message || "Login failed. Please try again.";
+    
+    if (error.message === "Session is already active elsewhere.") {
+      showLockScreen();
     }
   }
 }
@@ -562,7 +593,27 @@ function startPolling() {
 
 async function sendMessage() {
   const text = msgInput.value.trim();
-  if (!text || !isLoggedIn || !sessionToken || !isThisTabActive) return;
+  console.log('Attempting to send message:', { text, isLoggedIn, hasToken: !!sessionToken, isActive: isThisTabActive });
+  
+  if (!text) {
+    console.log('No text to send');
+    return;
+  }
+  if (!isLoggedIn) {
+    console.error('Not logged in');
+    alert('Please log in to send messages');
+    return;
+  }
+  if (!sessionToken) {
+    console.error('No session token');
+    alert('Session expired. Please refresh and log in again.');
+    return;
+  }
+  if (!isThisTabActive) {
+    console.error('Tab not active');
+    alert('Please use the active tab to send messages');
+    return;
+  }
 
   // Include replyingTo in the message data if it exists
   const messageData = {
@@ -580,6 +631,8 @@ async function sendMessage() {
     replyingTo = null;
   }
 
+  console.log('Sending message with data:', messageData);
+
   try {
     const response = await fetch(`${BACKEND_URL}/send`, {
       method: "POST",
@@ -590,8 +643,12 @@ async function sendMessage() {
       body: JSON.stringify(messageData)
     });
 
+    console.log('Send response status:', response.status);
+    const responseData = await response.json();
+    console.log('Send response data:', responseData);
+
     if (!response.ok) {
-      throw new Error('Failed to send message');
+      throw new Error(responseData.error || 'Failed to send message');
     }
 
     msgInput.value = "";
@@ -599,15 +656,29 @@ async function sendMessage() {
     loadMessages();
   } catch (error) {
     console.error('Error sending message:', error);
-    alert('Failed to send message. Please try again.');
+    if (error.message.includes('expired')) {
+      alert('Session expired. Please refresh and log in again.');
+      isLoggedIn = false;
+      sessionToken = null;
+      document.getElementById('login-overlay').style.display = 'flex';
+    } else {
+      alert('Failed to send message: ' + error.message);
+    }
   }
 }
 
 async function loadMessages() {
   if (!isLoggedIn || !isThisTabActive) return;
   const isTabActive = document.visibilityState === "visible";
-  const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=user&active=${isTabActive}`);
+  console.log('Fetching messages with token:', sessionToken);
+  const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=user&active=${isTabActive}`, {
+    headers: {
+      'Authorization': `Bearer ${sessionToken}`
+    }
+  });
+  console.log('Messages response status:', res.status);
   const data = await res.json();
+  console.log('Messages received:', data);
 
   // Determine whether we should auto-scroll: only if user is already near bottom
   const wasNearBottom = chatContainer.scrollTop + chatContainer.clientHeight >= chatContainer.scrollHeight - 60;
@@ -911,7 +982,26 @@ fileInput.addEventListener("change", async () => {
 sendBtn.addEventListener("mousedown", e => e.preventDefault());
 sendBtn.addEventListener("click", sendMessage);
 clearBtn.addEventListener("click", clearChat);
+
+// Handle message input and typing events
 msgInput.addEventListener("input", e => sendTyping(e.target.value));
+
+// Add Enter key support for sending messages
+msgInput.addEventListener("keydown", async (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault(); // Prevent newline
+    await sendMessage();
+  }
+});
+
+// Double-check login status when focus returns to input
+msgInput.addEventListener("focus", () => {
+  if (!isLoggedIn || !sessionToken) {
+    console.log('Detected missing login on input focus');
+    alert('Please log in to send messages');
+    document.getElementById('login-overlay').style.display = 'flex';
+  }
+});
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
