@@ -539,7 +539,14 @@ async function loadMessages() {
     // Add timestamp
     const timestamp = document.createElement("div");
     timestamp.className = "timestamp";
-    timestamp.textContent = new Date(m.timestamp * 1000).toLocaleString();
+    const date = new Date(m.timestamp * 1000);
+    timestamp.textContent = date.toLocaleString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      month: 'short',
+      day: 'numeric'
+    });
     d.appendChild(timestamp);
 
     // Add reactions
