@@ -593,7 +593,7 @@ function startPolling() {
 
 async function sendMessage() {
   const text = msgInput.value.trim();
-  console.log('Attempting to send message:', { text, isLoggedIn, hasToken: !!sessionToken, isActive: isThisTabActive });
+  console.log('Attempting to send/edit message:', { text, isLoggedIn, hasToken: !!sessionToken, isActive: isThisTabActive });
   
   if (!text) {
     console.log('No text to send');
@@ -613,6 +613,40 @@ async function sendMessage() {
     console.error('Tab not active');
     alert('Please use the active tab to send messages');
     return;
+  }
+
+  // Check if we're editing a message
+  if (window.messageBeingEdited) {
+    try {
+      const response = await fetch(`${BACKEND_URL}/edit_message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`
+        },
+        body: JSON.stringify({
+          chat_id: chatId,
+          message_id: window.messageBeingEdited,
+          text: text,
+          user_id: 'user'
+        })
+      });
+      
+      if (!response.ok) throw new Error('Failed to edit message');
+      
+      // Clear edit mode
+      window.messageBeingEdited = null;
+      const editIndicator = document.getElementById('edit-indicator');
+      if (editIndicator) editIndicator.remove();
+      
+      msgInput.value = '';
+      loadMessages();
+      return;
+    } catch (error) {
+      console.error('Edit error:', error);
+      alert('Failed to edit message');
+      return;
+    }
   }
 
   // Include replyingTo in the message data if it exists
@@ -801,37 +835,129 @@ async function loadMessages() {
       options.classList.toggle('show');
     });
 
-    // 1) Edit (user only)
-    if (m.sender === 'user') {
-      const editBtn = document.createElement('button'); editBtn.className = 'option-btn'; editBtn.title = 'Edit'; editBtn.textContent = '✏️';
-      editBtn.addEventListener('click', async (ev) => {
-        ev.stopPropagation();
-        const newText = prompt('Edit message:', m.text);
-        if (newText !== null && newText.trim() !== '' && newText !== m.text) {
-          try {
-            const r = await fetch(`${BACKEND_URL}/edit_message`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ chat_id: chatId, message_id: m.id, text: newText, user_id: 'user' }) });
-            if (r.ok) loadMessages(); else throw new Error('edit failed');
-          } catch (err) { console.error(err); alert('Edit failed'); }
-        }
+// 1) Edit (user only)
+      if (m.sender === 'user') {
+        const editBtn = document.createElement('button'); editBtn.className = 'option-btn'; editBtn.title = 'Edit'; editBtn.textContent = '✏️';
+        editBtn.addEventListener('click', async (ev) => {
+          ev.stopPropagation();
+          // Store the message being edited
+          window.messageBeingEdited = m.id;
+          // Move text to input box
+          msgInput.value = m.text;
+          msgInput.focus();
+          // Show edit mode indicator
+          const editIndicator = document.createElement('div');
+          editIndicator.id = 'edit-indicator';
+          editIndicator.style.padding = '8px';
+          editIndicator.style.background = '#fff3e0';
+          editIndicator.style.marginBottom = '8px';
+          editIndicator.style.borderRadius = '8px';
+          editIndicator.style.display = 'flex';
+          editIndicator.style.alignItems = 'center';
+          editIndicator.style.gap = '8px';
+          
+          const editInfo = document.createElement('div');
+          editInfo.style.flex = '1';
+          editInfo.textContent = 'Editing message...';
+          
+          const cancelBtn = document.createElement('button');
+          cancelBtn.style.padding = '4px 8px';
+          cancelBtn.style.fontSize = '12px';
+          cancelBtn.textContent = '❌ Cancel Edit';
+          cancelBtn.onclick = () => {
+            window.messageBeingEdited = null;
+            msgInput.value = '';
+            editIndicator.remove();
+          };
+          
+          editIndicator.appendChild(editInfo);
+          editIndicator.appendChild(cancelBtn);
+          
+          // Remove any existing indicators
+          document.querySelectorAll('#edit-indicator, #reply-indicator').forEach(el => el.remove());
+          document.getElementById('input-container').insertBefore(editIndicator, msgInput);
+          
+          options.classList.remove('show');
+        });
+        options.appendChild(editBtn);      // 2) Delete - no confirmation
+      const delBtn = document.createElement('button'); delBtn.className = 'option-btn'; delBtn.title = 'Delete'; delBtn.textContent = '🗑️';
+      delBtn.addEventListener('click', (ev) => { 
+        ev.stopPropagation(); 
+        deleteMessage(m.id); 
         options.classList.remove('show');
       });
-      options.appendChild(editBtn);
-
-      // 2) Delete
-      const delBtn = document.createElement('button'); delBtn.className = 'option-btn'; delBtn.title = 'Delete'; delBtn.textContent = '🗑️';
-      delBtn.addEventListener('click', (ev) => { ev.stopPropagation(); if (confirm('Delete this message?')) { deleteMessage(m.id); options.classList.remove('show'); } });
       options.appendChild(delBtn);
     }
 
-    // 3) Emoji / React
-    const reactBtn = document.createElement('button'); reactBtn.className = 'option-btn'; reactBtn.title = 'React'; reactBtn.textContent = '😊';
+    // 3) Emoji / React with inline picker
+    const reactBtn = document.createElement('button'); reactBtn.className = 'option-btn'; reactBtn.title = 'Add Reaction'; reactBtn.textContent = '😊';
     reactBtn.addEventListener('click', (ev) => {
       ev.stopPropagation();
-      const picker = emojiPicker.cloneNode(true); picker.id = '';
-      picker.style.display = 'block'; picker.style.position = 'absolute'; picker.style.bottom = '100%'; picker.style.right = '0';
-      options.appendChild(picker);
-      picker.querySelectorAll('.emoji-btn').forEach(b => { b.addEventListener('click', (e) => { e.stopPropagation(); addReaction(m.id, b.dataset.emoji); picker.remove(); options.classList.remove('show'); }); });
-      document.addEventListener('click', () => { if (picker && picker.remove) picker.remove(); }, { once: true });
+      // Create inline emoji picker
+      const inlineReactions = document.createElement('div');
+      inlineReactions.className = 'inline-reactions';
+      inlineReactions.style.display = 'flex';
+      inlineReactions.style.flexWrap = 'wrap';
+      inlineReactions.style.gap = '4px';
+      inlineReactions.style.padding = '8px';
+      inlineReactions.style.background = '#fff';
+      inlineReactions.style.borderRadius = '12px';
+      inlineReactions.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+      inlineReactions.style.marginTop = '8px';
+      
+      // Quick reaction emojis
+      const quickEmojis = ['👍', '❤️', '😊', '😂', '😍', '🎉', '👏', '🔥'];
+      quickEmojis.forEach(emoji => {
+        const emojiBtn = document.createElement('button');
+        emojiBtn.className = 'quick-emoji-btn';
+        emojiBtn.textContent = emoji;
+        emojiBtn.style.padding = '6px';
+        emojiBtn.style.fontSize = '20px';
+        emojiBtn.style.border = 'none';
+        emojiBtn.style.background = 'transparent';
+        emojiBtn.style.cursor = 'pointer';
+        emojiBtn.style.borderRadius = '4px';
+        emojiBtn.style.transition = 'transform 0.1s';
+        emojiBtn.onmouseover = () => emojiBtn.style.transform = 'scale(1.2)';
+        emojiBtn.onmouseout = () => emojiBtn.style.transform = 'scale(1)';
+        emojiBtn.onclick = (e) => {
+          e.stopPropagation();
+          addReaction(m.id, emoji);
+          inlineReactions.remove();
+          options.classList.remove('show');
+        };
+        inlineReactions.appendChild(emojiBtn);
+      });
+      
+      // Add "More" button that shows full picker
+      const moreBtn = document.createElement('button');
+      moreBtn.textContent = '⋯';
+      moreBtn.style.padding = '6px 12px';
+      moreBtn.style.fontSize = '16px';
+      moreBtn.style.border = 'none';
+      moreBtn.style.background = '#f0f0f0';
+      moreBtn.style.cursor = 'pointer';
+      moreBtn.style.borderRadius = '4px';
+      moreBtn.onclick = (e) => {
+        e.stopPropagation();
+        const picker = emojiPicker.cloneNode(true);
+        picker.style.display = 'block';
+        inlineReactions.replaceWith(picker);
+        picker.querySelectorAll('.emoji-btn').forEach(b => {
+          b.addEventListener('click', (e) => {
+            e.stopPropagation();
+            addReaction(m.id, b.dataset.emoji);
+            picker.remove();
+            options.classList.remove('show');
+          });
+        });
+      };
+      inlineReactions.appendChild(moreBtn);
+      
+      // Replace any existing picker/reactions
+      const existing = d.querySelector('.inline-reactions, #emoji-picker');
+      if (existing) existing.remove();
+      d.appendChild(inlineReactions);
     });
     options.appendChild(reactBtn);
 
