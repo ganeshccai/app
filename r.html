@@ -317,78 +317,43 @@
     
 </div>
 <script>
-// --- *** START: localStorage TAB LOCK *** ---
-const LOCK_KEY = 'regal_chat_session_lock';
-const LOCK_TIMEOUT_MS = 3000; // 3 seconds timeout
-let isThisTabActive = true; // Default to true
-let sessionCheckInterval = null;
-
-// *** NEW: ADDED THIS FUNCTION ***
-/**
- * Manually clears the lock from localStorage and reloads the page.
- */
-function forceClearLock(e) {
-  if (e) e.preventDefault(); // Stop link from navigating
-  console.warn('Forcing lock release...');
-  localStorage.removeItem(LOCK_KEY);
-  window.location.reload();
-}
-// *** END NEW FUNCTION ***
-
+// Chat session management  
 function showLoginScreen() {
-  document.getElementById('lock-overlay').style.display = 'none';
   document.getElementById('login-overlay').style.display = 'flex';
 }
 
-/**
- * Checks the lock status in localStorage.
- * This runs when the page first loads.
- */
 function checkSessionLock() {
-  // Always show login screen initially
-  showLoginScreen();
-  
-  try {
-    // Clear any stale locks
-    const lockData = JSON.parse(localStorage.getItem(LOCK_KEY));
-    if (lockData) {
-      const isStale = (Date.now() - lockData.timestamp) > LOCK_TIMEOUT_MS;
-      if (isStale) {
-        localStorage.removeItem(LOCK_KEY);
-      }
-    }
-  } catch (e) {
-    localStorage.removeItem(LOCK_KEY);
-  }
+  showLoginScreen(); // Always show login screen initially
 }
-
-/**
- * Listens for changes in other tabs.
- */
-// Remove storage event listener - we're not using tab locks anymore
-// --- *** END: localStorage TAB LOCK *** ---
 
 
 const BACKEND_URL = "https://app-788207962975.us-central1.run.app";
 const chatId = document.body.dataset.chatId || "1234";
 
-const msgInput = document.getElementById("msg");
-const sendBtn = document.getElementById("send-btn");
-const clearBtn = document.getElementById("clear-btn");
-const chatContainer = document.getElementById("chat-container");
-const agentStatus = document.getElementById("agent-status");
-const uploadBtn = document.getElementById("upload-btn");
-const fileInput = document.getElementById("file-input");
-const emojiBtn = document.getElementById("emoji-btn");
-const emojiPicker = document.getElementById("emoji-picker");
-const unreadBadge = document.getElementById('unread-badge');
+// Store all DOM elements in one place
+const elements = {
+  msgInput: document.getElementById("msg"),
+  sendBtn: document.getElementById("send-btn"),
+  clearBtn: document.getElementById("clear-btn"),
+  chatContainer: document.getElementById("chat-container"),
+  agentStatus: document.getElementById("agent-status"),
+  uploadBtn: document.getElementById("upload-btn"),
+  fileInput: document.getElementById("file-input"),
+  emojiBtn: document.getElementById("emoji-btn"),
+  emojiPicker: document.getElementById("emoji-picker"),
+  unreadBadge: document.getElementById('unread-badge'),
+  loginOverlay: document.getElementById('login-overlay')
+};
 
-let isLoggedIn = false;
-let sessionToken = null;
-let typingDots = 0;
-let lastMessageCount = 0;
-let lastProcessedMessages = [];
-let replyingTo = null; // Track which message we're replying to
+// Global state variables
+const state = {
+  isLoggedIn: false,
+  sessionToken: null,
+  typingDots: 0,
+  lastMessageCount: 0,
+  lastProcessedMessages: [],
+  replyingTo: null,  // Track which message we're replying to
+};
 
 // Track whether user manually scrolled up; if true, avoid auto-scroll
 let userScrolledUp = false;
@@ -429,64 +394,36 @@ document.querySelectorAll(".emoji-btn").forEach(btn => {
 });
 
 async function checkPwd() {
-  // Clear any previous error message
-  document.getElementById("login-msg").textContent = "";
-
   const pwd = document.getElementById("pwd").value;
+  document.getElementById("login-msg").textContent = "";
+  
   if (!pwd) {
     document.getElementById("login-msg").textContent = "Please enter a password";
     return;
   }
 
   try {
-    console.log('Sending login request...');
     const res = await fetch(`${BACKEND_URL}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chat_id: chatId, password: pwd, sender: "user" })
     });
-
-    console.log('Login response status:', res.status);
+    
     const data = await res.json();
-    console.log('Login response:', data);
-
+    
     if (data.success && data.session_token) {
-      // --- Claim this tab as active ---
-      isThisTabActive = true; // This tab now holds the lock
-      const sessionData = { id: thisTabId, timestamp: Date.now() };
-      localStorage.setItem(LOCK_KEY, JSON.stringify(sessionData));
-      // --- End Claim ---
-
       sessionToken = data.session_token;
       document.getElementById("login-overlay").style.display = "none";
       isLoggedIn = true;
-      
-      // Clear any previous error message
-      document.getElementById("login-msg").textContent = "";
-      
-      // Store the token in sessionStorage as backup
-      try {
-        sessionStorage.setItem('regal_session_token', sessionToken);
-      } catch (e) {
-        console.warn('Failed to store token in sessionStorage:', e);
-      }
-      
-      console.log('Login successful, starting polling...');
       startPolling();
-      
-      // Load messages immediately
       loadMessages();
     } else {
       throw new Error(data.error || "Login failed");
     }
   } catch (error) {
-    console.error('Login error:', error);
     document.getElementById("login-msg").textContent = error.message || "Login failed. Please try again.";
-    
-    if (error.message === "Session is already active elsewhere.") {
-      showLockScreen();
-    }
   }
+}
 }
 
 function startPolling() {
@@ -539,109 +476,92 @@ function startPolling() {
 }
 
 async function sendMessage() {
-  const text = msgInput.value.trim();
-  console.log('Attempting to send/edit message:', { text, isLoggedIn, hasToken: !!sessionToken, isActive: isThisTabActive });
+  const text = elements.msgInput.value.trim();
   
-  if (!text) {
-    console.log('No text to send');
-    return;
-  }
-  if (!isLoggedIn) {
-    console.error('Not logged in');
-    alert('Please log in to send messages');
-    return;
-  }
-  if (!sessionToken) {
-    console.error('No session token');
-    alert('Session expired. Please refresh and log in again.');
-    return;
-  }
-  if (!isThisTabActive) {
-    console.error('Tab not active');
-    alert('Please use the active tab to send messages');
+  // Basic validation
+  if (!text) return;
+  
+  if (!state.isLoggedIn || !state.sessionToken) {
+    showLoginScreen();
     return;
   }
 
-  // Check if we're editing a message
-  if (window.messageBeingEdited) {
+    // Handle message editing
+  const messageBeingEdited = state.messageBeingEdited;
+  if (messageBeingEdited) {
     try {
       const response = await fetch(`${BACKEND_URL}/edit_message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken}`
+          'Authorization': `Bearer ${state.sessionToken}`
         },
         body: JSON.stringify({
           chat_id: chatId,
-          message_id: window.messageBeingEdited,
+          message_id: messageBeingEdited,
           text: text,
           user_id: 'user'
         })
       });
       
-      if (!response.ok) throw new Error('Failed to edit message');
+      if (!response.ok) {
+        throw new Error('Failed to edit message');
+      }
       
       // Clear edit mode
-      window.messageBeingEdited = null;
+      state.messageBeingEdited = null;
       const editIndicator = document.getElementById('edit-indicator');
       if (editIndicator) editIndicator.remove();
       
-      msgInput.value = '';
+      elements.msgInput.value = '';
       loadMessages();
       return;
     } catch (error) {
       console.error('Edit error:', error);
-      alert('Failed to edit message');
+      alert('Failed to edit message: ' + error.message);
       return;
     }
   }
 
-  // Include replyingTo in the message data if it exists
+    // Prepare message data
   const messageData = {
     chat_id: chatId,
     sender: "user",
     text
   };
   
-  // Add reply_to if we're replying to a message
-  if (typeof replyingTo !== 'undefined' && replyingTo !== null) {
-    messageData.reply_to = replyingTo;
-    // Clear reply indicator
+  // Add reply_to if replying to a message
+  if (state.replyingTo) {
+    messageData.reply_to = state.replyingTo;
     const replyIndicator = document.getElementById('reply-indicator');
     if (replyIndicator) replyIndicator.remove();
-    replyingTo = null;
+    state.replyingTo = null;
   }
-
-  console.log('Sending message with data:', messageData);
 
   try {
     const response = await fetch(`${BACKEND_URL}/send`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${sessionToken}`
+        "Authorization": `Bearer ${state.sessionToken}`
       },
       body: JSON.stringify(messageData)
     });
 
-    console.log('Send response status:', response.status);
     const responseData = await response.json();
-    console.log('Send response data:', responseData);
 
     if (!response.ok) {
       throw new Error(responseData.error || 'Failed to send message');
     }
 
-    msgInput.value = "";
+    elements.msgInput.value = "";
     await sendTyping("");
     loadMessages();
   } catch (error) {
-    console.error('Error sending message:', error);
     if (error.message.includes('expired')) {
-      alert('Session expired. Please refresh and log in again.');
-      isLoggedIn = false;
-      sessionToken = null;
-      document.getElementById('login-overlay').style.display = 'flex';
+      state.isLoggedIn = false;
+      state.sessionToken = null;
+      showLoginScreen();
     } else {
       alert('Failed to send message: ' + error.message);
     }
@@ -649,39 +569,40 @@ async function sendMessage() {
 }
 
 async function loadMessages() {
-  if (!isLoggedIn || !isThisTabActive) return;
+  if (!state.isLoggedIn) return;
+  
   const isTabActive = document.visibilityState === "visible";
-  console.log('Fetching messages with token:', sessionToken);
-  const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=user&active=${isTabActive}`, {
-    headers: {
-      'Authorization': `Bearer ${sessionToken}`
+  
+  try {
+    const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=user&active=${isTabActive}`, {
+      headers: {
+        'Authorization': `Bearer ${state.sessionToken}`
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
     }
-  });
-  console.log('Messages response status:', res.status);
-  const data = await res.json();
-  console.log('Messages received:', data);
 
-  // Determine whether we should auto-scroll: only if user is already near bottom
-  const wasNearBottom = chatContainer.scrollTop + chatContainer.clientHeight >= chatContainer.scrollHeight - 60;
+    const data = await res.json();
 
-  // Create message lookup for replies
-  const messagesById = {};
-  data.forEach(m => {
-    if (m.id) messagesById[m.id] = m;
-  });
-
-  chatContainer.innerHTML = "";
-
+    // Auto-scroll logic
+  const container = elements.chatContainer;
+  const wasNearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 60;
+  
+  // Reset container
+  container.innerHTML = "";
+  
+  // Map for message references
+  const messagesById = new Map(data.map(m => [m.id, m]));
+  
+  // Track changes
   const currentMessageIds = data.map((m, i) => `${m.sender}-${m.text}-${i}`);
-  const newMessages = data.filter((m, i) => {
-    const msgId = `${m.sender}-${m.text}-${i}`;
-    return !lastProcessedMessages.includes(msgId);
-  });
-
-  const newLoveMessage = newMessages.some(m => m.text && /\blove\b/i.test(m.text));
-  const newGoodnightMessage = newMessages.some(m => 
-    m.text && /\b(goodnight|gn|gnsd|gntc|gnsdtc)\b/i.test(m.text)
-  );
+  const newMessages = data.filter((m, i) => !state.lastProcessedMessages.includes(`${m.sender}-${m.text}-${i}`));
+  
+  // Check for special messages
+  const hasNewLove = newMessages.some(m => m.text?.match(/\blove\b/i));
+  const hasNewGoodnight = newMessages.some(m => m.text?.match(/\b(goodnight|gn|gnsd|gntc|gnsdtc)\b/i));
   
   if (newLoveMessage) {
     spawnLoveBubbles();
@@ -1090,22 +1011,33 @@ async function loadMessages() {
 }
 
 async function loadTyping() {
-  if (!isLoggedIn || !isThisTabActive) return;
-  const res = await fetch(`${BACKEND_URL}/get_live_typing/${chatId}`);
-  const d = await res.json();
+  if (!state.isLoggedIn) return;
 
-  const oldTyping = document.getElementById("agent-typing-indicator");
-  if (oldTyping) oldTyping.remove();
+  try {
+    const res = await fetch(`${BACKEND_URL}/get_live_typing/${chatId}`);
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
 
-  if (d.sender === "agent" && d.text) {
-    typingDots = (typingDots + 1) % 4;
-    const dots = ".".repeat(typingDots);
-    const typingMsg = document.createElement("div");
-    typingMsg.id = "agent-typing-indicator";
-    typingMsg.className = "message agent-msg";
-    typingMsg.textContent = `Typing${dots}`;
-    chatContainer.appendChild(typingMsg);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+    const data = await res.json();
+
+    const oldTyping = document.getElementById("agent-typing-indicator");
+    if (oldTyping) oldTyping.remove();
+
+    if (data.sender === "agent" && data.text) {
+      state.typingDots = (state.typingDots + 1) % 4;
+      const dots = ".".repeat(state.typingDots);
+      
+      const typingMsg = document.createElement("div");
+      typingMsg.id = "agent-typing-indicator";
+      typingMsg.className = "message agent-msg";
+      typingMsg.textContent = `Typing${dots}`;
+      
+      elements.chatContainer.appendChild(typingMsg);
+      elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+    }
+  } catch (error) {
+    console.error('Error checking typing status:', error);
   }
 }
 
@@ -1147,18 +1079,17 @@ async function clearChat() {
 
 // Add / edit / delete / react helper functions
 async function addReaction(messageId, emoji) {
-  if (!isLoggedIn || !sessionToken) {
-    alert('Please log in to react to messages');
+  if (!state.isLoggedIn || !state.sessionToken) {
+    showLoginScreen();
     return;
   }
 
   try {
-    console.log('Adding reaction:', { messageId, emoji });
-    const r = await fetch(`${BACKEND_URL}/react`, {
+    const response = await fetch(`${BACKEND_URL}/react`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json', 
-        'Authorization': `Bearer ${sessionToken}`
+        'Authorization': `Bearer ${state.sessionToken}`
       },
       body: JSON.stringify({ 
         chat_id: chatId, 
@@ -1168,25 +1099,22 @@ async function addReaction(messageId, emoji) {
       })
     });
 
-    const data = await r.json();
-    console.log('Reaction response:', data);
-
-    if (!r.ok) throw new Error(data.error || 'Failed to add reaction');
+    const data = await response.json();
     
-    // Close any open emoji pickers
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to add reaction');
+    }
+    
+    // Close any open emoji pickers and refresh messages
     document.querySelectorAll('.inline-reactions').forEach(el => el.remove());
-    
-    // Refresh messages to show updated reactions
     await loadMessages();
-  } catch (e) {
-    console.error('React error:', e);
-    if (e.message.includes('expired')) {
-      alert('Session expired. Please refresh and log in again.');
-      isLoggedIn = false;
-      sessionToken = null;
-      document.getElementById('login-overlay').style.display = 'flex';
+  } catch (error) {
+    if (error.message.includes('expired')) {
+      state.isLoggedIn = false;
+      state.sessionToken = null;
+      showLoginScreen();
     } else {
-      alert('Failed to add reaction: ' + e.message);
+      alert('Failed to add reaction: ' + error.message);
     }
   }
 }
@@ -1254,40 +1182,47 @@ fileInput.addEventListener("change", async () => {
   reader.readAsDataURL(file);
 });
 
-sendBtn.addEventListener("mousedown", e => e.preventDefault());
-sendBtn.addEventListener("click", sendMessage);
-clearBtn.addEventListener("click", clearChat);
-
-// Handle message input and typing events
-msgInput.addEventListener("input", e => sendTyping(e.target.value));
-
-// Add Enter key support for sending messages
-msgInput.addEventListener("keydown", async (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault(); // Prevent newline
-    await sendMessage();
-  }
-});
-
-// Double-check login status when focus returns to input
-msgInput.addEventListener("focus", () => {
-  if (!isLoggedIn || !sessionToken) {
-    console.log('Detected missing login on input focus');
-    alert('Please log in to send messages');
-    document.getElementById('login-overlay').style.display = 'flex';
-  }
-});
-
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") {
-    // When tab becomes visible, re-check the lock
-    checkSessionLock();
-    if (isLoggedIn) {
+// Event Listeners
+function setupEventListeners() {
+  const { sendBtn, clearBtn, msgInput } = elements;
+  
+  // Send button
+  sendBtn.addEventListener("mousedown", e => e.preventDefault());
+  sendBtn.addEventListener("click", sendMessage);
+  
+  // Clear button
+  clearBtn.addEventListener("click", clearChat);
+  
+  // Message input events
+  msgInput.addEventListener("input", e => sendTyping(e.target.value));
+  
+  // Handle Enter key
+  msgInput.addEventListener("keydown", async (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      await sendMessage();
+    }
+  });
+  
+  // Input focus check
+  msgInput.addEventListener("focus", () => {
+    if (!state.isLoggedIn) {
+      showLoginScreen();
+    }
+  });
+  
+  // Page visibility
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      if (!state.isLoggedIn) {
+        showLoginScreen();
+      } else {
         markOnline();
         loadMessages();
+      }
     }
-  }
-});
+  });
+}
 
 window.addEventListener("beforeunload", () => {
   // Clean up on window close
@@ -1381,10 +1316,20 @@ setInterval(pollPublicCounts, 5000);
 // Run once immediately
 pollPublicCounts();
 
-// --- Run the lock check on page load ---
-document.addEventListener('DOMContentLoaded', () => {
-    checkSessionLock();
-});
+// Initialize the application
+function initializeApp() {
+  // Show login screen initially
+  showLoginScreen();
+  
+  // Set up all event listeners
+  setupEventListeners();
+  
+  // Start polling when user is logged in (handled by checkPwd)
+  // Additional initialization if needed
+}
+
+// Run initialization on page load
+document.addEventListener('DOMContentLoaded', initializeApp);
 </script>
 </body>
 </html>
