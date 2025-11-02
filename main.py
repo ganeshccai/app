@@ -73,14 +73,18 @@ def login():
     for t in expired_tokens:
         active_tokens.pop(t)
 
-    # Check for active sessions
-    active_session = any(now - ts < 3600 for ts in active_tokens.values())
-    if active_session:
-        return jsonify(success=False, error="Session is already active elsewhere.")
-
     if password == "1":
+        # Create new token and cleanup old ones if too many
         token = f"{sender}-{int(now)}"
-        session_tokens.setdefault((chat_id, sender), {})[token] = now
+        tokens_dict = session_tokens.setdefault((chat_id, sender), {})
+        tokens_dict[token] = now
+
+        # Keep only the 2 most recent tokens to allow some overlap during reconnection
+        if len(tokens_dict) > 2:
+            oldest_tokens = sorted(tokens_dict.items(), key=lambda x: x[1])[:-2]
+            for old_token, _ in oldest_tokens:
+                tokens_dict.pop(old_token)
+
         return jsonify(success=True, session_token=token)
     return jsonify(success=False, error="Invalid password")
 
