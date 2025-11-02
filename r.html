@@ -511,6 +511,7 @@ let sessionToken = null;
 let typingDots = 0;
 let lastMessageCount = 0;
 let lastProcessedMessages = [];
+let replyingTo = null;
 
 // Emoji picker toggle
 emojiBtn.addEventListener("click", (e) => {
@@ -542,25 +543,31 @@ document.querySelectorAll(".emoji-btn").forEach(btn => {
 });
 
 async function checkPwd() {
-  // --- Check lock before logging in ---
   try {
-    const lockData = JSON.parse(localStorage.getItem(LOCK_KEY));
-    const isStale = !lockData || (Date.now() - lockData.timestamp) > LOCK_TIMEOUT_MS;
+    // --- Check lock before logging in ---
+    try {
+      const lockData = JSON.parse(localStorage.getItem(LOCK_KEY));
+      const isStale = !lockData || (Date.now() - lockData.timestamp) > LOCK_TIMEOUT_MS;
 
-    if (lockData && !isStale) {
-      // Another tab is active. Show error.
-      document.getElementById("login-msg").textContent = "Session is active in another tab.";
-      return; // Stop login
+      if (lockData && !isStale) {
+        // Another tab is active. Show error.
+        document.getElementById("login-msg").textContent = "Session is active in another tab.";
+        return; // Stop login
+      }
+    } catch(e) { /* continue */ }
+    // --- End Check ---
+
+    const pwd = document.getElementById("pwd").value;
+    if (!pwd) {
+      document.getElementById("login-msg").textContent = "Please enter password";
+      return;
     }
-  } catch(e) { /* continue */ }
-  // --- End Check ---
 
-  const pwd = document.getElementById("pwd").value;
-  const res = await fetch(`${BACKEND_URL}/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, password: pwd, sender: "user" })
-  });
+    const res = await fetch(`${BACKEND_URL}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, password: pwd, sender: "user" })
+    });
 
   const data = await res.json();
   if (data.success) {
@@ -582,6 +589,9 @@ async function checkPwd() {
         showLockScreen();
     }
   }
+} catch (error) {
+    console.error("Login error:", error);
+    document.getElementById("login-msg").textContent = "Error connecting to server";
 }
 
 function startPolling() {
@@ -634,31 +644,61 @@ function startPolling() {
 }
 
 async function sendMessage() {
-  const text = msgInput.value.trim();
-  if (!text || !isLoggedIn || !sessionToken) return;
+  try {
+    const text = msgInput.value.trim();
+    if (!text) {
+      console.log("No text to send");
+      return;
+    }
+    if (!isLoggedIn || !sessionToken || !isThisTabActive) {
+      console.log("Not properly logged in or tab not active");
+      return;
+    }
 
-  const messageData = { 
-    chat_id: chatId, 
-    sender: "user", 
-    text 
-  };
+    const messageData = { 
+      chat_id: chatId, 
+      sender: "user", 
+      text 
+    };
 
-  // Add reply-to if replying to a message
-  if (replyingTo) {
-    messageData.reply_to = replyingTo;
-    replyingTo = null;
-    const indicator = document.getElementById("reply-indicator");
-    if (indicator) indicator.remove();
+    // Add reply-to if replying to a message
+    if (replyingTo) {
+      messageData.reply_to = replyingTo;
+      replyingTo = null;
+      const indicator = document.getElementById("reply-indicator");
+      if (indicator) indicator.remove();
+    }
+
+    console.log("Sending message:", messageData);
+
+    const response = await fetch(`${BACKEND_URL}/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${sessionToken}`
+      },
+      body: JSON.stringify(messageData)
+    });
+
+    if (!response.ok) {
+      if (response.status === 403) {
+        // Session expired
+        isLoggedIn = false;
+        sessionToken = null;
+        document.getElementById("login-overlay").style.display = "flex";
+        return;
+      }
+      throw new Error(`Failed to send message: ${response.status}`);
+    }
+
+    console.log("Message sent successfully");
+    msgInput.value = "";
+    await sendTyping("");
+    await loadMessages();
+  } catch (error) {
+    console.error("Error sending message:", error);
+    alert("Failed to send message. Please try again.");
   }
-
-  await fetch(`${BACKEND_URL}/send`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
-    },
-    body: JSON.stringify(messageData)
-  });
 
   msgInput.value = "";
   await sendTyping("");
@@ -706,9 +746,25 @@ async function deleteMessage(messageId) {
 }
 
 async function loadMessages() {
-  if (!isLoggedIn || !isThisTabActive) return;
-  const isTabActive = document.visibilityState === "visible";
-  const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=user&active=${isTabActive}`);
+  if (!isLoggedIn || !isThisTabActive || !sessionToken) return;
+  try {
+    const isTabActive = document.visibilityState === "visible";
+    const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=user&active=${isTabActive}`, {
+      headers: {
+        "Authorization": `Bearer ${sessionToken}`
+      }
+    });
+    
+    if (!res.ok) {
+      if (res.status === 403) {
+        // Session expired
+        isLoggedIn = false;
+        sessionToken = null;
+        document.getElementById("login-overlay").style.display = "flex";
+        return;
+      }
+      throw new Error(`Failed to load messages: ${res.status}`);
+    }
   const data = await res.json();
   
   // If we have new messages and the window is not active, show the unread badge
@@ -742,7 +798,6 @@ async function loadMessages() {
 
   lastProcessedMessages = currentMessageIds;
 
-  let replyingTo = null;
   data.forEach((m, i) => {
     const d = document.createElement("div");
     d.className = "message " + (m.sender === "user" ? "user-msg" : "agent-msg");
@@ -880,35 +935,65 @@ async function loadMessages() {
 }
 
 async function loadTyping() {
-  if (!isLoggedIn || !isThisTabActive) return;
-  const res = await fetch(`${BACKEND_URL}/get_live_typing/${chatId}`);
-  const d = await res.json();
+  try {
+    if (!isLoggedIn || !isThisTabActive) return;
+    const res = await fetch(`${BACKEND_URL}/get_live_typing/${chatId}`);
+    
+    if (!res.ok) {
+      if (res.status === 403) {
+        // Session expired
+        isLoggedIn = false;
+        sessionToken = null;
+        document.getElementById("login-overlay").style.display = "flex";
+        return;
+      }
+      throw new Error(`Failed to load typing status: ${res.status}`);
+    }
 
-  const oldTyping = document.getElementById("agent-typing-indicator");
-  if (oldTyping) oldTyping.remove();
+    const d = await res.json();
 
-  if (d.sender === "agent" && d.text) {
-    typingDots = (typingDots + 1) % 4;
-    const dots = ".".repeat(typingDots);
-    const typingMsg = document.createElement("div");
-    typingMsg.id = "agent-typing-indicator";
-    typingMsg.className = "message agent-msg";
-    typingMsg.textContent = `Typing${dots}`;
-    chatContainer.appendChild(typingMsg);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+    const oldTyping = document.getElementById("agent-typing-indicator");
+    if (oldTyping) oldTyping.remove();
+
+    if (d.sender === "agent" && d.text) {
+      typingDots = (typingDots + 1) % 4;
+      const dots = ".".repeat(typingDots);
+      const typingMsg = document.createElement("div");
+      typingMsg.id = "agent-typing-indicator";
+      typingMsg.className = "message agent-msg";
+      typingMsg.textContent = `Typing${dots}`;
+      chatContainer.appendChild(typingMsg);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+  } catch (error) {
+    console.error("Error loading typing status:", error);
   }
-}
 
 async function sendTyping(text) {
-  if (!isLoggedIn || !isThisTabActive) return;
-  await fetch(`${BACKEND_URL}/live_typing`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
-    },
-    body: JSON.stringify({ chat_id: chatId, sender: "user", text })
-  });
+  try {
+    if (!isLoggedIn || !isThisTabActive) return;
+    const response = await fetch(`${BACKEND_URL}/live_typing`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${sessionToken}`
+      },
+      body: JSON.stringify({ chat_id: chatId, sender: "user", text })
+    });
+
+    if (!response.ok) {
+      if (response.status === 403) {
+        // Session expired
+        isLoggedIn = false;
+        sessionToken = null;
+        document.getElementById("login-overlay").style.display = "flex";
+        return;
+      }
+      throw new Error(`Failed to send typing status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error("Error sending typing status:", error);
+  }
 }
 
 async function checkStatus() {
@@ -921,30 +1006,62 @@ async function checkStatus() {
 }
 
 async function clearChat() {
-  if (!isLoggedIn || !isThisTabActive) return;
-  await fetch(`${BACKEND_URL}/clear_chat/${chatId}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
-    },
-    body: JSON.stringify({ sender: "user" })
-  });
-  chatContainer.innerHTML = "";
-  lastMessageCount = 0;
-  lastProcessedMessages = [];
+  try {
+    if (!isLoggedIn || !isThisTabActive) return;
+    const response = await fetch(`${BACKEND_URL}/clear_chat/${chatId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${sessionToken}`
+      },
+      body: JSON.stringify({ sender: "user" })
+    });
+
+    if (!response.ok) {
+      if (response.status === 403) {
+        // Session expired
+        isLoggedIn = false;
+        sessionToken = null;
+        document.getElementById("login-overlay").style.display = "flex";
+        return;
+      }
+      throw new Error(`Failed to clear chat: ${response.status}`);
+    }
+
+    chatContainer.innerHTML = "";
+    lastMessageCount = 0;
+    lastProcessedMessages = [];
+  } catch (error) {
+    console.error("Error clearing chat:", error);
+    alert("Failed to clear chat. Please try again.");
+  }
 }
 
 async function markOnline() {
-  if (!isLoggedIn || !isThisTabActive) return;
-  await fetch(`${BACKEND_URL}/mark_online`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
-    },
-    body: JSON.stringify({ chat_id: chatId, sender: "user" })
-  });
+  try {
+    if (!isLoggedIn || !isThisTabActive) return;
+    const response = await fetch(`${BACKEND_URL}/mark_online`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${sessionToken}`
+      },
+      body: JSON.stringify({ chat_id: chatId, sender: "user" })
+    });
+
+    if (!response.ok) {
+      if (response.status === 403) {
+        // Session expired
+        isLoggedIn = false;
+        sessionToken = null;
+        document.getElementById("login-overlay").style.display = "flex";
+        return;
+      }
+      throw new Error(`Failed to mark online: ${response.status}`);
+    }
+  } catch (error) {
+    console.error("Error marking online:", error);
+  }
 }
 
 uploadBtn.addEventListener("click", () => fileInput.click());
