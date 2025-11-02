@@ -365,7 +365,7 @@ const scrollManager = {
       this.userScrolledUp = !nearBottom;
     });
   },
-  
+
   isNearBottom() {
     const container = elements.chatContainer;
     return container.scrollTop + container.clientHeight >= container.scrollHeight - 60;
@@ -379,31 +379,31 @@ const scrollManager = {
 };
 
 // Emoji picker toggle
-emojiBtn.addEventListener("click", (e) => {
+elements.emojiBtn.addEventListener("click", (e) => {
   e.stopPropagation();
-  emojiPicker.classList.toggle("show");
+  elements.emojiPicker.classList.toggle("show");
 });
 
 // Close emoji picker when clicking outside
 document.addEventListener("click", (e) => {
-  if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
-    emojiPicker.classList.remove("show");
+  if (!elements.emojiPicker.contains(e.target) && e.target !== elements.emojiBtn) {
+    elements.emojiPicker.classList.remove("show");
   }
 });
 
-// Insert emoji into message
+// Insert emoji into message (picker buttons)
 document.querySelectorAll(".emoji-btn").forEach(btn => {
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
     const emoji = btn.dataset.emoji;
-    const cursorPos = msgInput.selectionStart;
-    const textBefore = msgInput.value.substring(0, cursorPos);
-    const textAfter = msgInput.value.substring(cursorPos);
-    msgInput.value = textBefore + emoji + textAfter;
-    msgInput.focus();
-    msgInput.selectionStart = msgInput.selectionEnd = cursorPos + emoji.length;
-    emojiPicker.classList.remove("show");
-    sendTyping(msgInput.value);
+    const cursorPos = elements.msgInput.selectionStart;
+    const textBefore = elements.msgInput.value.substring(0, cursorPos);
+    const textAfter = elements.msgInput.value.substring(cursorPos);
+    elements.msgInput.value = textBefore + emoji + textAfter;
+    elements.msgInput.focus();
+    elements.msgInput.selectionStart = elements.msgInput.selectionEnd = cursorPos + emoji.length;
+    elements.emojiPicker.classList.remove("show");
+    sendTyping(elements.msgInput.value);
   });
 });
 
@@ -438,54 +438,26 @@ async function checkPwd() {
     document.getElementById("login-msg").textContent = error.message || "Login failed. Please try again.";
   }
 }
-}
+
 
 function startPolling() {
-  // --- Heartbeat to keep the lock alive ---
-  if (sessionCheckInterval) clearInterval(sessionCheckInterval);
-  
-  sessionCheckInterval = setInterval(() => {
-    if (isThisTabActive && isLoggedIn) {
-      // This tab is active, refresh its lock
-      try {
-        const sessionData = { id: thisTabId, timestamp: Date.now() };
-        localStorage.setItem(LOCK_KEY, JSON.stringify(sessionData));
-      } catch (e) {
-        console.error("Failed to write heartbeat, stopping.", e);
-        // This can happen if storage is full
-        isThisTabActive = false;
-        isLoggedIn = false;
-        clearInterval(sessionCheckInterval);
-        showLockScreen();
-      }
-    } else {
-      // This tab is no longer active, stop the heartbeat
-      clearInterval(sessionCheckInterval);
-    }
-  }, 2000); // Refresh lock every 2 seconds
-  // --- End Heartbeat ---
+  if (!state.isLoggedIn) return;
 
+  // Clear any existing interval we created earlier
+  if (window.__regalPollInterval) clearInterval(window.__regalPollInterval);
+
+  // Run immediate checks
   markOnline();
   checkStatus();
   loadMessages();
   loadTyping();
-  
-  // Consolidating your intervals
-  setInterval(() => {
-    if (!isLoggedIn || !isThisTabActive) return; // Stop polling if not active
+
+  // Poll regularly while logged in
+  window.__regalPollInterval = setInterval(() => {
+    if (!state.isLoggedIn) return;
     loadMessages();
     checkStatus();
-  }, 1000);
-
-  setInterval(() => {
-    if (!isLoggedIn || !isThisTabActive) return;
     loadTyping();
-  }, 500);
-  
-  setInterval(() => {
-    if (document.visibilityState === "visible" && isLoggedIn && isThisTabActive) {
-        markOnline();
-    }
   }, 2000);
 }
 
@@ -715,8 +687,7 @@ async function loadMessages() {
         
         d.appendChild(replyToDiv);
       }
-    }
-    
+
     // Add message ID for reply linking
     d.setAttribute("data-message-id", m.id);
 
@@ -766,7 +737,7 @@ async function loadMessages() {
     const options = document.createElement('div');
     options.className = 'options';
 
-    ts.addEventListener('click', (e) => {
+    timestamp.addEventListener('click', (e) => {
       e.stopPropagation();
       document.querySelectorAll('.options.show').forEach(o => { if (o !== options) o.classList.remove('show'); });
       options.classList.toggle('show');
@@ -778,10 +749,10 @@ async function loadMessages() {
         editBtn.addEventListener('click', async (ev) => {
           ev.stopPropagation();
           // Store the message being edited
-          window.messageBeingEdited = m.id;
+          state.messageBeingEdited = m.id;
           // Move text to input box
-          msgInput.value = m.text;
-          msgInput.focus();
+          elements.msgInput.value = m.text;
+          elements.msgInput.focus();
           // Show edit mode indicator
           const editIndicator = document.createElement('div');
           editIndicator.id = 'edit-indicator';
@@ -802,8 +773,8 @@ async function loadMessages() {
           cancelBtn.style.fontSize = '12px';
           cancelBtn.textContent = '❌ Cancel Edit';
           cancelBtn.onclick = () => {
-            window.messageBeingEdited = null;
-            msgInput.value = '';
+            state.messageBeingEdited = null;
+            elements.msgInput.value = '';
             editIndicator.remove();
           };
           
@@ -833,7 +804,7 @@ async function loadMessages() {
     reactBtn.textContent = '😊';
     reactBtn.addEventListener('click', (ev) => {
       ev.stopPropagation();
-      const picker = emojiPicker.cloneNode(true);
+  const picker = elements.emojiPicker.cloneNode(true);
       picker.id = '';
       picker.style.display = 'block';
       picker.style.position = 'absolute';
@@ -863,7 +834,12 @@ async function loadMessages() {
       };
       document.addEventListener('click', closeHandler);
       
-      // Quick reaction emojis
+      // Quick reaction emojis (inline)
+      const inlineReactions = document.createElement('div');
+      inlineReactions.className = 'inline-reactions';
+      inlineReactions.style.display = 'flex';
+      inlineReactions.style.gap = '6px';
+
       const quickEmojis = ['👍', '❤️', '😊', '😂', '😍', '🎉', '👏', '🔥'];
       quickEmojis.forEach(emoji => {
         const emojiBtn = document.createElement('button');
@@ -887,7 +863,7 @@ async function loadMessages() {
         inlineReactions.appendChild(emojiBtn);
       });
       
-      // Add "More" button that shows full picker
+  // Add "More" button that shows full picker
       const moreBtn = document.createElement('button');
       moreBtn.textContent = '⋯';
       moreBtn.style.padding = '6px 12px';
@@ -898,7 +874,7 @@ async function loadMessages() {
       moreBtn.style.borderRadius = '4px';
       moreBtn.onclick = (e) => {
         e.stopPropagation();
-        const picker = emojiPicker.cloneNode(true);
+        const picker = elements.emojiPicker.cloneNode(true);
         picker.style.display = 'block';
         inlineReactions.replaceWith(picker);
         picker.querySelectorAll('.emoji-btn').forEach(b => {
@@ -964,13 +940,13 @@ async function loadMessages() {
       cancelBtn.style.fontSize = '12px';
       cancelBtn.textContent = '❌ Cancel Reply';
       cancelBtn.addEventListener('click', () => {
-        replyingTo = null;
+        state.replyingTo = null;
         replyIndicator.remove();
       });
       
       replyIndicator.appendChild(replyInfo);
       replyIndicator.appendChild(cancelBtn);
-      document.getElementById('input-container').insertBefore(replyIndicator, msgInput);
+      document.getElementById('input-container').insertBefore(replyIndicator, elements.msgInput);
       options.classList.remove('show');
     });
     options.appendChild(replyBtn);
@@ -1006,7 +982,7 @@ async function loadMessages() {
       d.appendChild(reactionsDiv);
     }
 
-    d.appendChild(ts);
+  d.appendChild(timestamp);
     d.appendChild(options);
 
     const isLast = i === data.length - 1;
@@ -1019,7 +995,7 @@ async function loadMessages() {
       d.appendChild(seenTag);
     }
 
-    chatContainer.appendChild(d);
+  elements.chatContainer.appendChild(d);
 
     if (m.timestamp) highestTs = Math.max(highestTs, m.timestamp);
   });
@@ -1029,8 +1005,8 @@ async function loadMessages() {
   }
 
   // Auto-scroll only if user was at/near bottom
-  if (wasNearBottom && !userScrolledUp) {
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+  if (wasNearBottom && !scrollManager.userScrolledUp) {
+    elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
   }
 
   // Update unread badge for non-logged users via localStorage comparison
@@ -1039,7 +1015,9 @@ async function loadMessages() {
     const unread = data.filter(m => (m.timestamp || 0) > stored).length;
     setUnreadBadge(unread);
   } catch (e) { /* ignore */ }
-}
+  } catch (error) {
+    console.error('loadMessages error:', error);
+  }
 
 async function loadTyping() {
   if (!state.isLoggedIn) return;
@@ -1103,7 +1081,7 @@ async function clearChat() {
     },
     body: JSON.stringify({ sender: "user" })
   });
-  chatContainer.innerHTML = "";
+  elements.chatContainer.innerHTML = "";
   lastMessageCount = 0;
   lastProcessedMessages = [];
 }
