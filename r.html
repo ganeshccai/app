@@ -1222,31 +1222,100 @@ async function markOnline() {
   }
 }
 
-uploadBtn.addEventListener("click", () => fileInput.click());
+uploadBtn.addEventListener("click", () => {
+  if (!isLoggedIn || !sessionToken || !isThisTabActive) {
+    alert("Please ensure you are logged in before uploading files.");
+    return;
+  }
+  fileInput.click();
+});
 
 fileInput.addEventListener("change", async () => {
   const file = fileInput.files[0];
   if (!file || !isLoggedIn || !sessionToken || !isThisTabActive) return;
+  
+  // Validate file size (max 5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    alert("File size too large. Please upload images under 5MB.");
+    fileInput.value = '';
+    return;
+  }
+  
+  // Validate file type
+  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+  if (!validTypes.includes(file.type)) {
+    alert("Please upload only JPG, PNG or GIF images.");
+    fileInput.value = '';
+    return;
+  }
 
-  const reader = new FileReader();
-  reader.onload = async () => {
-    const base64 = reader.result;
-    await fetch(`${BACKEND_URL}/send`, {
-      method: "POST",
+  try {
+    const progressDiv = document.createElement('div');
+    progressDiv.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      z-index: 1000;
+    `;
+    progressDiv.textContent = 'Uploading image...';
+    document.body.appendChild(progressDiv);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('chat_id', chatId);
+    formData.append('sender', 'user');
+
+    // First, upload the file
+    const uploadResponse = await fetch(`${BACKEND_URL}/upload`, {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${sessionToken}`
+        'Authorization': `Bearer ${sessionToken}`
+      },
+      body: formData
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error(`Upload failed: ${uploadResponse.status}`);
+    }
+
+    const uploadResult = await uploadResponse.json();
+    if (!uploadResult.success) {
+      throw new Error(uploadResult.error || 'Upload failed');
+    }
+
+    // Then send the message with the URL
+    const messageResponse = await fetch(`${BACKEND_URL}/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${sessionToken}`
       },
       body: JSON.stringify({
         chat_id: chatId,
-        sender: "user",
-        type: "image",
-        url: base64
+        sender: 'user',
+        type: 'image',
+        url: uploadResult.url
       })
     });
+
+    if (!messageResponse.ok) {
+      throw new Error(`Failed to send message: ${messageResponse.status}`);
+    }
+
+    fileInput.value = '';
     loadMessages();
-  };
-  reader.readAsDataURL(file);
+    progressDiv.remove();
+  } catch (error) {
+    console.error('Upload error:', error);
+    alert(`Failed to upload image: ${error.message}`);
+    const progressDiv = document.querySelector('div[style*="position: fixed"]');
+    if (progressDiv) progressDiv.remove();
+  }
 });
 
 sendBtn.addEventListener("mousedown", e => e.preventDefault());
@@ -1325,3 +1394,5 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
+
