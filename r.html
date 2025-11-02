@@ -932,6 +932,9 @@ async function loadMessages() {
   }
 
   chatContainer.scrollTop = chatContainer.scrollHeight;
+  } catch (error) {
+    console.error("Error loading messages:", error);
+  }
 }
 
 async function loadTyping() {
