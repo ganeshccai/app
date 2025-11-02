@@ -45,13 +45,16 @@ def format_last_seen(ts):
         return ""
     delta = int(time.time() - ts)
     if delta < 60:
-        return f"{delta} sec ago"
+        return "just now"
     elif delta < 3600:
-        return f"{delta // 60} min ago"
-    elif delta < 86400:
-        return f"{delta // 3600} hr ago"
+        mins = delta // 60
+        return f"{mins} min ago"
     else:
-        return f"{delta // 86400} days ago"
+        # Format timestamp in 12-hour format
+        from datetime import datetime
+
+        dt = datetime.fromtimestamp(ts)
+        return dt.strftime("%I:%M %p, %b %d").replace(" 0", " ").lstrip("0")
 
 
 @app.route("/login", methods=["POST"])
@@ -162,6 +165,29 @@ def delete_message():
     for i, msg in enumerate(chat_messages):
         if msg["id"] == message_id and msg["sender"] == user_id:
             chat_messages.pop(i)
+            return jsonify(success=True)
+
+    return jsonify(error="Message not found or unauthorized"), 404
+
+
+@app.route("/edit_message", methods=["POST"])
+def edit_message():
+    data = request.json
+    chat_id = data["chat_id"]
+    message_id = data["message_id"]
+    text = data["text"]
+    user_id = data["user_id"]
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+
+    if not verify_token(chat_id, user_id, token):
+        return jsonify(error="Unauthorized"), 403
+
+    chat_messages = messages.get(chat_id, [])
+    for msg in chat_messages:
+        if msg["id"] == message_id and msg["sender"] == user_id:
+            msg["text"] = text
+            msg["edited"] = True
+            msg["edit_timestamp"] = time.time()
             return jsonify(success=True)
 
     return jsonify(error="Message not found or unauthorized"), 404
