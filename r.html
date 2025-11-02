@@ -742,12 +742,25 @@ async function loadMessages() {
       d.innerHTML = (m.text || "").replace(/\n/g, "<br>");
     }
 
-    // TIMESTAMP (show date+time; title shows full locale string)
-    const ts = document.createElement('div');
-    ts.className = 'timestamp';
-    const dt = new Date((m.timestamp || Date.now()) * 1000);
-    ts.textContent = dt.toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-    ts.title = dt.toLocaleString();
+        // Create timestamp element with tooltip
+    const timestamp = document.createElement('div');
+    timestamp.className = 'timestamp';
+    timestamp.style.fontSize = '11px';
+    timestamp.style.color = '#666';
+    timestamp.style.marginTop = '4px';
+    
+    const date = new Date((m.timestamp || Date.now()) * 1000);
+    const timeString = new Intl.DateTimeFormat('default', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }).format(date);
+    
+    timestamp.textContent = timeString;
+    timestamp.title = date.toLocaleString();
 
     // Options container toggled only by timestamp click
     const options = document.createElement('div');
@@ -906,27 +919,31 @@ async function loadMessages() {
     });
     options.appendChild(reactBtn);
 
-    // 4) Reply
-    const replyBtn = document.createElement('button'); replyBtn.className = 'option-btn'; replyBtn.title = 'Reply'; replyBtn.textContent = '↩️';
+        // Reply button with indicator
+    const replyBtn = document.createElement('button');
+    replyBtn.className = 'option-btn';
+    replyBtn.title = 'Reply';
+    replyBtn.textContent = '↩️';
+    replyBtn.style.cursor = 'pointer';
+    
     replyBtn.addEventListener('click', (ev) => {
       ev.stopPropagation();
-      replyingTo = m.id;
-      msgInput.focus();
+      state.replyingTo = m.id;
+      elements.msgInput.focus();
       
-      // Remove existing reply indicator if any
-      const existing = document.getElementById('reply-indicator');
-      if (existing) existing.remove();
-      
-      // Create new reply indicator
+      // Setup reply indicator
       const replyIndicator = document.createElement('div');
       replyIndicator.id = 'reply-indicator';
-      replyIndicator.style.padding = '8px';
-      replyIndicator.style.background = '#f0f0f0';
-      replyIndicator.style.marginBottom = '8px';
-      replyIndicator.style.borderRadius = '8px';
-      replyIndicator.style.display = 'flex';
-      replyIndicator.style.alignItems = 'center';
-      replyIndicator.style.gap = '8px';
+      Object.assign(replyIndicator.style, {
+        padding: '8px',
+        background: '#f0f0f0',
+        marginBottom: '8px',
+        borderRadius: '8px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        fontSize: '13px'
+      });
       
       // Add reply icon and sender info
       const replyInfo = document.createElement('div');
@@ -1134,14 +1151,40 @@ async function addReaction(messageId, emoji) {
 }
 
 async function deleteMessage(messageId) {
-  if (!isLoggedIn || !isThisTabActive) return;
+  if (!state.isLoggedIn) {
+    showLoginScreen();
+    return;
+  }
+
   try {
-    const r = await fetch(`${BACKEND_URL}/delete_message`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ chat_id: chatId, message_id: messageId, user_id: 'user' }) });
-    if (!r.ok) throw new Error('delete failed');
-    loadMessages();
-  } catch (e) {
-    console.error('Delete error', e);
-    alert('Failed to delete');
+    const response = await fetch(`${BACKEND_URL}/delete_message`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.sessionToken}`
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        user_id: 'user'
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to delete message');
+    }
+
+    await loadMessages();
+  } catch (error) {
+    if (error.message.includes('expired')) {
+      state.isLoggedIn = false;
+      state.sessionToken = null;
+      showLoginScreen();
+    } else {
+      alert('Failed to delete message: ' + error.message);
+    }
   }
 }
 
@@ -1302,17 +1345,50 @@ function setUnreadBadge(count) {
   } catch (e) { /* ignore */ }
 }
 
-async function pollPublicCounts() {
-  try {
-    const res = await fetch(`${BACKEND_URL}/messages/${chatId}`);
-    if (!res.ok) return;
-    const msgs = await res.json();
-    if (!Array.isArray(msgs) || msgs.length === 0) { setUnreadBadge(0); return; }
-    const lastSeen = parseInt(localStorage.getItem('regal_last_seen_ts') || '0', 10);
-    const unread = msgs.filter(m => (m.timestamp || 0) > lastSeen).length;
-    setUnreadBadge(unread);
-  } catch (e) { /* ignore */ }
-}
+const notificationManager = {
+  lastSeenKey: 'regal_last_seen_ts',
+  
+  async pollPublicCounts() {
+    if (state.isLoggedIn) return; // Only poll when logged out
+    
+    try {
+      const res = await fetch(`${BACKEND_URL}/messages/${chatId}`);
+      if (!res.ok) throw new Error('Failed to fetch messages');
+      
+      const messages = await res.json();
+      if (!Array.isArray(messages)) return;
+      
+      const lastSeen = parseInt(localStorage.getItem(this.lastSeenKey) || '0', 10);
+      const unread = messages.filter(m => (m.timestamp || 0) > lastSeen).length;
+      
+      this.updateBadge(unread);
+      this.updateTitle(unread);
+    } catch (error) {
+      console.warn('Failed to poll unread count:', error);
+    }
+  },
+  
+  updateBadge(count) {
+    const badge = elements.unreadBadge;
+    if (!badge) return;
+    
+    badge.style.display = count > 0 ? 'inline-block' : 'none';
+    badge.textContent = count > 99 ? '99+' : String(count);
+  },
+  
+  updateTitle(count) {
+    document.title = count > 0 
+      ? `(${count}) ${document.title.replace(/^\(\d+\)\s*/, '')}` 
+      : document.title.replace(/^\(\d+\)\s*/, '');
+  },
+  
+  markSeen() {
+    const now = Math.floor(Date.now() / 1000);
+    localStorage.setItem(this.lastSeenKey, String(now));
+    this.updateBadge(0);
+    this.updateTitle(0);
+  }
+};
 
 // Mark seen when clicking the badge
 if (unreadBadge) {
@@ -1332,14 +1408,32 @@ pollPublicCounts();
 
 // Initialize the application
 function initializeApp() {
+  // Initialize managers
+  scrollManager.init();
+  
   // Show login screen initially
   showLoginScreen();
   
   // Set up all event listeners
   setupEventListeners();
   
-  // Start polling when user is logged in (handled by checkPwd)
-  // Additional initialization if needed
+  // Start unread count polling for logged-out state
+  setInterval(() => notificationManager.pollPublicCounts(), 5000);
+  notificationManager.pollPublicCounts(); // Initial poll
+  
+  // Handle unread badge clicks
+  if (elements.unreadBadge) {
+    elements.unreadBadge.addEventListener('click', () => {
+      notificationManager.markSeen();
+    });
+  }
+  
+  // Handle visibility changes
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.isLoggedIn) {
+      notificationManager.markSeen();
+    }
+  });
 }
 
 // Run initialization on page load
