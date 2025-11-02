@@ -21,7 +21,23 @@ def generate_message_id():
 
 
 def verify_token(chat_id, sender, token):
-    return token in session_tokens.get((chat_id, sender), {})
+    """Verify session token with expiration check."""
+    if not token:
+        return False
+
+    tokens = session_tokens.get((chat_id, sender), {})
+    if token not in tokens:
+        return False
+
+    # Check token expiration (1 hour)
+    now = time.time()
+    if now - tokens[token] > 3600:
+        tokens.pop(token)  # Remove expired token
+        return False
+
+    # Update token timestamp
+    tokens[token] = now
+    return True
 
 
 def format_last_seen(ts):
@@ -47,9 +63,17 @@ def login():
 
     active_tokens = session_tokens.get((chat_id, sender), {})
     now = time.time()
-    for t, ts in active_tokens.items():
-        if now - ts < 10:
-            return jsonify(success=False, error="Try after 5 sec")
+    # Clean up expired tokens
+    expired_tokens = [
+        t for t, ts in active_tokens.items() if now - ts > 3600
+    ]  # 1 hour expiry
+    for t in expired_tokens:
+        active_tokens.pop(t)
+
+    # Check for active sessions
+    active_session = any(now - ts < 3600 for ts in active_tokens.values())
+    if active_session:
+        return jsonify(success=False, error="Session is already active elsewhere.")
 
     if password == "1":
         token = f"{sender}-{int(now)}"
@@ -167,7 +191,15 @@ def upload():
 
 @app.route("/messages/<chat_id>")
 def get_messages(chat_id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
     viewer = request.args.get("viewer")
+
+    if not viewer:
+        return jsonify(error="Viewer parameter required"), 400
+
+    if not verify_token(chat_id, viewer, token):
+        return jsonify(error="Session expired or invalid"), 403
+
     active = request.args.get("active") == "true"
     chat = messages.get(chat_id, [])
 
@@ -196,13 +228,28 @@ def live_typing():
     if not verify_token(chat_id, sender, token):
         return jsonify(error="Unauthorized"), 403
 
-    typing_status[chat_id] = {"sender": sender, "text": text}
+    typing_status[chat_id] = {"sender": sender, "text": text, "timestamp": time.time()}
     return jsonify(success=True)
 
 
 @app.route("/get_live_typing/<chat_id>")
 def get_live_typing(chat_id):
-    return jsonify(typing_status.get(chat_id, {}))
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    viewer = request.args.get("viewer")
+
+    if not viewer:
+        return jsonify(error="Viewer parameter required"), 400
+
+    if not verify_token(chat_id, viewer, token):
+        return jsonify(error="Session expired or invalid"), 403
+
+    # Clean up old typing status (after 5 seconds)
+    status = typing_status.get(chat_id, {})
+    if status and time.time() - status.get("timestamp", 0) > 5:
+        typing_status.pop(chat_id, None)
+        return jsonify({})
+
+    return jsonify(status)
 
 
 @app.route("/mark_online", methods=["POST"])
