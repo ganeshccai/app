@@ -1407,6 +1407,18 @@ function initializeApp() {
   // Initialize managers
   scrollManager.init();
   
+  // Defensive: clear any stale lock keys and ensure the lock overlay is hidden so login isn't blocked
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (k.toLowerCase().includes('lock')) localStorage.removeItem(k);
+    }
+  } catch (e) { console.warn('initializeApp lock cleanup failed', e); }
+
+  const lockEl = document.getElementById('lock-overlay');
+  if (lockEl) lockEl.style.display = 'none';
+
   // Show login screen initially
   showLoginScreen();
   
