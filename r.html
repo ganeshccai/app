@@ -717,6 +717,12 @@ async function loadMessages() {
   // Determine whether we should auto-scroll: only if user is already near bottom
   const wasNearBottom = chatContainer.scrollTop + chatContainer.clientHeight >= chatContainer.scrollHeight - 60;
 
+  // Create message lookup for replies
+  const messagesById = {};
+  data.forEach(m => {
+    if (m.id) messagesById[m.id] = m;
+  });
+
   chatContainer.innerHTML = "";
 
   const currentMessageIds = data.map((m, i) => `${m.sender}-${m.text}-${i}`);
@@ -748,34 +754,70 @@ async function loadMessages() {
     d.className = "message " + (m.sender === "user" ? "user-msg" : "agent-msg");
     
     // If this is a reply message, show the original message above
-    if (m.reply_to) {
-      const originalMsg = data.find(msg => msg.id === m.reply_to);
-      if (originalMsg) {
-        const replyToDiv = document.createElement("div");
-        replyToDiv.className = "reply-to";
-        replyToDiv.style.fontSize = "12px";
-        replyToDiv.style.padding = "4px 8px";
-        replyToDiv.style.background = "rgba(0,0,0,0.05)";
-        replyToDiv.style.borderRadius = "8px";
-        replyToDiv.style.marginBottom = "4px";
-        replyToDiv.style.position = "relative";
-        replyToDiv.style.cursor = "pointer";
-        
-        // Add reply indicator
-        const replyIndicator = document.createElement("div");
-        replyIndicator.style.fontSize = "11px";
-        replyIndicator.style.color = "#666";
-        replyIndicator.style.marginBottom = "2px";
-        replyIndicator.textContent = `↳ Reply to ${originalMsg.sender}:`;
-        replyToDiv.appendChild(replyIndicator);
-        
-        // Add original message preview
-        const preview = document.createElement("div");
-        preview.style.whiteSpace = "nowrap";
-        preview.style.overflow = "hidden";
-        preview.style.textOverflow = "ellipsis";
-        preview.textContent = originalMsg.text || "(image)";
-        replyToDiv.appendChild(preview);
+    if (m.reply_to && messagesById[m.reply_to]) {
+      const originalMsg = messagesById[m.reply_to];
+      const replyToDiv = document.createElement("div");
+      replyToDiv.className = "reply-to";
+      replyToDiv.style.fontSize = "13px";
+      replyToDiv.style.padding = "8px 12px";
+      replyToDiv.style.background = "rgba(0,0,0,0.035)";
+      replyToDiv.style.borderRadius = "12px 12px 4px 4px";
+      replyToDiv.style.marginBottom = "4px";
+      replyToDiv.style.position = "relative";
+      replyToDiv.style.cursor = "pointer";
+      replyToDiv.style.border = "1px solid rgba(0,0,0,0.05)";
+      replyToDiv.style.borderBottom = "2px solid " + (originalMsg.sender === "user" ? "#ffcce0" : "#e0e0e0");
+      
+      // Add reply header with icon
+      const replyHeader = document.createElement("div");
+      replyHeader.style.display = "flex";
+      replyHeader.style.alignItems = "center";
+      replyHeader.style.marginBottom = "4px";
+      replyHeader.style.gap = "6px";
+      replyHeader.style.color = "#666";
+      
+      const replyIcon = document.createElement("span");
+      replyIcon.textContent = "↱";
+      replyIcon.style.fontSize = "16px";
+      replyHeader.appendChild(replyIcon);
+      
+      const replyText = document.createElement("span");
+      replyText.textContent = `Replying to ${originalMsg.sender}'s message:`;
+      replyText.style.fontSize = "12px";
+      replyHeader.appendChild(replyText);
+      
+      replyToDiv.appendChild(replyHeader);
+      
+      // Add original message preview with styling
+      const preview = document.createElement("div");
+      preview.style.display = "flex";
+      preview.style.flexDirection = "column";
+      preview.style.gap = "4px";
+      
+      // Message content
+      const content = document.createElement("div");
+      content.style.whiteSpace = "pre-wrap";
+      content.style.overflow = "hidden";
+      content.style.maxHeight = "3.6em";
+      content.style.color = "#000";
+      content.textContent = originalMsg.text || "(image)";
+      preview.appendChild(content);
+      
+      // Timestamp for original message
+      const timestamp = document.createElement("div");
+      timestamp.style.fontSize = "11px";
+      timestamp.style.color = "#888";
+      const dt = new Date((originalMsg.timestamp || Date.now()) * 1000);
+      timestamp.textContent = dt.toLocaleString([], { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric', 
+        hour: 'numeric', 
+        minute: '2-digit' 
+      });
+      preview.appendChild(timestamp);
+      
+      replyToDiv.appendChild(preview);
         
         // Click to scroll to original message
         replyToDiv.addEventListener("click", () => {
@@ -891,8 +933,21 @@ async function loadMessages() {
 
     // 3) Emoji / React with inline picker
     const reactBtn = document.createElement('button'); reactBtn.className = 'option-btn'; reactBtn.title = 'Add Reaction'; reactBtn.textContent = '😊';
+    
+    // Track if picker is open
+    let isPickerOpen = false;
+    
     reactBtn.addEventListener('click', (ev) => {
       ev.stopPropagation();
+      
+      // Toggle picker state
+      isPickerOpen = !isPickerOpen;
+      
+      // Remove any existing pickers
+      document.querySelectorAll('.inline-reactions').forEach(el => el.remove());
+      
+      if (!isPickerOpen) return;
+      
       // Create inline emoji picker
       const inlineReactions = document.createElement('div');
       inlineReactions.className = 'inline-reactions';
@@ -904,6 +959,8 @@ async function loadMessages() {
       inlineReactions.style.borderRadius = '12px';
       inlineReactions.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
       inlineReactions.style.marginTop = '8px';
+      inlineReactions.style.position = 'absolute';
+      inlineReactions.style.zIndex = '100';
       
       // Quick reaction emojis
       const quickEmojis = ['👍', '❤️', '😊', '😂', '😍', '🎉', '👏', '🔥'];
@@ -1137,18 +1194,47 @@ async function clearChat() {
 
 // Add / edit / delete / react helper functions
 async function addReaction(messageId, emoji) {
-  // requires auth
+  if (!isLoggedIn || !sessionToken) {
+    alert('Please log in to react to messages');
+    return;
+  }
+
   try {
+    console.log('Adding reaction:', { messageId, emoji });
     const r = await fetch(`${BACKEND_URL}/react`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-      body: JSON.stringify({ chat_id: chatId, message_id: messageId, reaction: emoji, user_id: 'user' })
+      headers: { 
+        'Content-Type': 'application/json', 
+        'Authorization': `Bearer ${sessionToken}`
+      },
+      body: JSON.stringify({ 
+        chat_id: chatId, 
+        message_id: messageId, 
+        reaction: emoji, 
+        user_id: 'user' 
+      })
     });
-    if (!r.ok) throw new Error('react failed');
-    loadMessages();
+
+    const data = await r.json();
+    console.log('Reaction response:', data);
+
+    if (!r.ok) throw new Error(data.error || 'Failed to add reaction');
+    
+    // Close any open emoji pickers
+    document.querySelectorAll('.inline-reactions').forEach(el => el.remove());
+    
+    // Refresh messages to show updated reactions
+    await loadMessages();
   } catch (e) {
-    console.error('React error', e);
-    alert('Failed to react');
+    console.error('React error:', e);
+    if (e.message.includes('expired')) {
+      alert('Session expired. Please refresh and log in again.');
+      isLoggedIn = false;
+      sessionToken = null;
+      document.getElementById('login-overlay').style.display = 'flex';
+    } else {
+      alert('Failed to add reaction: ' + e.message);
+    }
   }
 }
 
