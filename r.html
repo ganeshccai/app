@@ -590,15 +590,10 @@ async function loadMessages() {
   const hasNewLove = newMessages.some(m => m.text?.match(/\blove\b/i));
   const hasNewGoodnight = newMessages.some(m => m.text?.match(/\b(goodnight|gn|gnsd|gntc|gnsdtc)\b/i));
   
-  if (newLoveMessage) {
-    spawnLoveBubbles();
-  }
-  
-  if (newGoodnightMessage) {
-    spawnSleepBubbles();
-  }
+  if (hasNewLove) spawnLoveBubbles();
+  if (hasNewGoodnight) spawnSleepBubbles();
 
-  lastProcessedMessages = currentMessageIds;
+  state.lastProcessedMessages = currentMessageIds;
 
   // Track highest timestamp to support unread badge
   let highestTs = 0;
@@ -783,7 +778,7 @@ async function loadMessages() {
           
           // Remove any existing indicators
           document.querySelectorAll('#edit-indicator, #reply-indicator').forEach(el => el.remove());
-          document.getElementById('input-container').insertBefore(editIndicator, msgInput);
+          document.getElementById('input-container').insertBefore(editIndicator, elements.msgInput);
           
           options.classList.remove('show');
         });
@@ -1000,8 +995,8 @@ async function loadMessages() {
     if (m.timestamp) highestTs = Math.max(highestTs, m.timestamp);
   });
 
-  if (data.length > lastMessageCount) {
-    lastMessageCount = data.length;
+  if (data.length > state.lastMessageCount) {
+    state.lastMessageCount = data.length;
   }
 
   // Auto-scroll only if user was at/near bottom
@@ -1263,7 +1258,9 @@ function setupEventListeners() {
 
 window.addEventListener("beforeunload", () => {
   // Clean up on window close
-  localStorage.removeItem(LOCK_KEY);
+  try {
+    if (typeof LOCK_KEY !== 'undefined') localStorage.removeItem(LOCK_KEY);
+  } catch (e) { /* ignore */ }
 
   try {
     const data = JSON.stringify({ chat_id: chatId, sender: "user" });
@@ -1313,13 +1310,14 @@ function spawnSleepBubbles() {
 // Unread / notification badge helpers (works for logged-out users using localStorage timestamp)
 function setUnreadBadge(count) {
   try {
-    if (!unreadBadge) return;
+    const badge = elements.unreadBadge;
+    if (!badge) return;
     if (count && count > 0) {
-      unreadBadge.style.display = 'inline-block';
-      unreadBadge.textContent = count > 99 ? '99+' : String(count);
+      badge.style.display = 'inline-block';
+      badge.textContent = count > 99 ? '99+' : String(count);
       document.title = `(${count}) ${document.title.replace(/^\(\d+\)\s*/, '')}`;
     } else {
-      unreadBadge.style.display = 'none';
+      badge.style.display = 'none';
       document.title = document.title.replace(/^\(\d+\)\s*/, '');
     }
   } catch (e) { /* ignore */ }
@@ -1371,8 +1369,8 @@ const notificationManager = {
 };
 
 // Mark seen when clicking the badge
-if (unreadBadge) {
-  unreadBadge.addEventListener('click', () => {
+if (elements.unreadBadge) {
+  elements.unreadBadge.addEventListener('click', () => {
     fetch(`${BACKEND_URL}/messages/${chatId}`).then(r=>r.json()).then(msgs=>{
       const maxTs = Math.max(0, ...msgs.map(m=>m.timestamp||0));
       localStorage.setItem('regal_last_seen_ts', String(maxTs));
@@ -1380,11 +1378,6 @@ if (unreadBadge) {
     }).catch(()=>{});
   });
 }
-
-// Poll every 5 seconds for public unread counts (works even if not logged in)
-setInterval(pollPublicCounts, 5000);
-// Run once immediately
-pollPublicCounts();
 
 // Initialize the application
 function initializeApp() {
