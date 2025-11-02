@@ -319,10 +319,9 @@
 <script>
 // --- *** START: localStorage TAB LOCK *** ---
 const LOCK_KEY = 'regal_chat_session_lock';
-const LOCK_TIMEOUT_MS = 5000; // 5 seconds
-const thisTabId = Date.now().toString() + Math.random();
-let isThisTabActive = false; // Flag to track if this tab holds the lock
-let sessionCheckInterval = null; // Holds the interval timer
+const LOCK_TIMEOUT_MS = 3000; // 3 seconds timeout
+let isThisTabActive = true; // Default to true
+let sessionCheckInterval = null;
 
 // *** NEW: ADDED THIS FUNCTION ***
 /**
@@ -336,15 +335,6 @@ function forceClearLock(e) {
 }
 // *** END NEW FUNCTION ***
 
-function showLockScreen() {
-  document.getElementById('login-overlay').style.display = 'none';
-  document.getElementById('lock-overlay').style.display = 'flex';
-  isThisTabActive = false;
-  isLoggedIn = false;
-  // Stop all polling timers if they exist
-  if (sessionCheckInterval) clearInterval(sessionCheckInterval);
-}
-
 function showLoginScreen() {
   document.getElementById('lock-overlay').style.display = 'none';
   document.getElementById('login-overlay').style.display = 'flex';
@@ -355,57 +345,27 @@ function showLoginScreen() {
  * This runs when the page first loads.
  */
 function checkSessionLock() {
+  // Always show login screen initially
+  showLoginScreen();
+  
   try {
+    // Clear any stale locks
     const lockData = JSON.parse(localStorage.getItem(LOCK_KEY));
-    
-    if (!lockData) {
-      // No lock exists. Show the login screen.
-      showLoginScreen();
-      return;
-    }
-
-    const isStale = (Date.now() - lockData.timestamp) > LOCK_TIMEOUT_MS;
-    
-    if (isStale) {
-      // Lock is old or "stale". This tab can take it.
-      console.warn('Found stale lock, clearing it.');
-      localStorage.removeItem(LOCK_KEY);
-      showLoginScreen();
-    } else {
-      // Lock is fresh and held by another tab.
-      console.log('Session is active elsewhere. Locking this tab.');
-      showLockScreen();
+    if (lockData) {
+      const isStale = (Date.now() - lockData.timestamp) > LOCK_TIMEOUT_MS;
+      if (isStale) {
+        localStorage.removeItem(LOCK_KEY);
+      }
     }
   } catch (e) {
-    // Error parsing, probably bad data. Clear it and login.
-    console.error('Error checking session lock, clearing.', e);
     localStorage.removeItem(LOCK_KEY);
-    showLoginScreen();
   }
 }
 
 /**
  * Listens for changes in other tabs.
  */
-window.addEventListener('storage', (e) => {
-  if (e.key === LOCK_KEY) {
-    if (e.newValue === null) {
-      // The lock was released by the active tab.
-      console.log('Session lock released by another tab. Reloading to enable login.');
-      window.location.reload();
-    } else {
-      // Another tab just took or refreshed the lock.
-      // If it wasn't this tab, lock this one.
-      try {
-        const lockData = JSON.parse(e.newValue);
-        if (lockData && lockData.id !== thisTabId) {
-          console.log('Session taken by another tab. Locking this one.');
-          showLockScreen();
-        }
-      } catch (e) { /* ignore parse error */ }
-    }
-  }
-});
+// Remove storage event listener - we're not using tab locks anymore
 // --- *** END: localStorage TAB LOCK *** ---
 
 
@@ -469,18 +429,8 @@ document.querySelectorAll(".emoji-btn").forEach(btn => {
 });
 
 async function checkPwd() {
-  // --- Check lock before logging in ---
-  try {
-    const lockData = JSON.parse(localStorage.getItem(LOCK_KEY));
-    const isStale = !lockData || (Date.now() - lockData.timestamp) > LOCK_TIMEOUT_MS;
-
-    if (lockData && !isStale && lockData.id !== thisTabId) {
-      // Another tab is active. Show error.
-      document.getElementById("login-msg").textContent = "Session is active in another tab.";
-      return; // Stop login
-    }
-  } catch(e) { /* continue */ }
-  // --- End Check ---
+  // Clear any previous error message
+  document.getElementById("login-msg").textContent = "";
 
   const pwd = document.getElementById("pwd").value;
   if (!pwd) {
@@ -1340,17 +1290,8 @@ document.addEventListener("visibilitychange", () => {
 });
 
 window.addEventListener("beforeunload", () => {
-  // --- Release lock if this tab is the active one ---
-  if (isThisTabActive && isLoggedIn) {
-    try {
-      const currentLock = JSON.parse(localStorage.getItem(LOCK_KEY));
-      // Only remove if this tab owns the lock
-      if (currentLock && currentLock.id === thisTabId) {
-        localStorage.removeItem(LOCK_KEY);
-      }
-    } catch(e) { /* ignore cleanup errors */ }
-  }
-  // --- End Release ---
+  // Clean up on window close
+  localStorage.removeItem(LOCK_KEY);
 
   try {
     const data = JSON.stringify({ chat_id: chatId, sender: "user" });
