@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
   <title>R</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' style='stop-color:%23feda75'/><stop offset='25%' style='stop-color:%23fa7e1e'/><stop offset='50%' style='stop-color:%23d62976'/><stop offset='75%' style='stop-color:%23962fbf'/><stop offset='100%' style='stop-color:%234f5bd5'/></linearGradient></defs><rect width='100' height='100' rx='20' fill='url(%23grad)'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white' font-family='serif' font-style='italic' font-weight='bold'>R</text></svg>" />
+  <!-- ... (Your existing head content: icons, manifest, etc. are unchanged) ... -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' style='stop-color:%23feda75'/><stop offset='25%' style='stop-color:%23fa7e1e'/><stop offset='50%' style='stop-color:%23d62976'/><stop offset='75%' style='stop-color:%23962fbf'/><stop offset='100%' style='stop-color:%234f5bd5'/></linearGradient></defs><rect width='100' height='100' rx='20' fill='url(%23grad)'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white' font-family='serif' font-style='italic' font-weight='bold'>R</text></svg>" />
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' style='stop-color:%23feda75'/><stop offset='25%' style='stop-color:%23fa7e1e'/><stop offset='50%' style='stop-color:%23d62976'/><stop offset='75%' style='stop-color:%23962fbf'/><stop offset='100%' style='stop-color:%234f5bd5'/></linearGradient></defs><rect width='100' height='100' rx='20' fill='url(%23grad)'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white' font-family='serif' font-style='italic' font-weight='bold'>R</text></svg>" />
   <meta name="theme-color" content="#d62976" />
   <link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22Regal%22%2C%22short_name%22%3A%22Regal%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f3f6fb%22%2C%22theme_color%22%3A%22%23d62976%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20512%20512%27%3E%3Cdefs%3E%3ClinearGradient%20id%3D%27grad%27%20x1%3D%270%25%27%20y1%3D%270%25%27%20x2%3D%27100%25%27%20y2%3D%27100%25%27%3E%3Cstop%20offset%3D%270%25%27%20style%3D%27stop-color%3A%23feda75%27%2F%3E%3Cstop%20offset%3D%2725%25%27%20style%3D%27stop-color%3A%23fa7e1e%27%2F%3E%3Cstop%20offset%3D%2750%25%27%20style%3D%27stop-color%3A%23d62976%27%2F%3E%3Cstop%20offset%3D%2775%25%27%20style%3D%27stop-color%3A%23962fbf%27%2F%3E%3Cstop%20offset%3D%27100%25%27%20style%3D%27stop-color%3A%234f5bd5%27%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%27512%27%20height%3D%27512%27%20rx%3D%27100%27%20fill%3D%27url(%23grad)%27%2F%3E%3Ctext%20x%3D%27256%27%20y%27360%27%20font-size%3D%27300%27%20text-anchor%3D%27middle%27%20fill%3D%27white%27%20font-family%3D%27serif%27%20font-style%3D%27italic%27%20font-weight%3D%27bold%27%3ER%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D" />
@@ -188,7 +189,6 @@
     background: rgba(255,255,255,0.9);
     border-top: 1px solid #ccc;
     position: relative;
-    /* min-width:50px; REMOVED, was causing issues */
     max-height: 200px; /* NEW: Increased max-height for reply */
   }
   
@@ -224,12 +224,14 @@
   }
   
   /* NEW: Wrapper for the main input row */
+  /* This container holds the original input layout */
   #input-row {
     display: flex;
     gap: 10px;
     padding: 12px;
     min-width: 50px;
     max-height: 100px;
+    align-items: center; /* Vertically center items in row */
   }
   
   #msg {
@@ -255,6 +257,7 @@
     cursor: pointer;
     font-size: 16px;
     transition: background 0.3s ease;
+    flex-shrink: 0; /* NEW: Prevent buttons from shrinking */
   }
   button:hover {
     background: #c2185b;
@@ -297,6 +300,7 @@
     flex-direction: column;
     gap: 2px;
     position: relative;
+    flex-shrink: 0; /* NEW: Prevent shrinking */
   }
   .extra-buttons button {
     padding: 10px 14px;
@@ -386,7 +390,7 @@
     text-align: left;
     font-size: 14px;
     cursor: pointer;
-  t min-width: 120px;
+    min-width: 120px;
   }
   .context-menu-btn:hover {
     background: #f5f5f5;
@@ -413,7 +417,7 @@
   .reaction-picker-btn {
     background: none;
     border: none;
-    font-size: 24px;
+     font-size: 24px;
     cursor: pointer;
     padding: 4px;
     border-radius: 8px;
@@ -427,6 +431,7 @@
 </head>
 <body data-chat-id="1234">
 
+<!-- ... (Login overlay and Lock overlay are unchanged) ... -->
 <div id="login-overlay">
   <div id="login-box">
     <input type="password" id="pwd" placeholder="Enter password" />
@@ -450,14 +455,17 @@
 <header>𝓡𝓮𝓰𝓪𝓵 <span id="agent-status">🔴</span></header>
 <div id="chat-container"></div>
 
+<!-- NEW: Input container now includes reply box -->
 <div id="input-container">
-    <div id="reply-context-box" data-reply-id="">
+  <!-- NEW: Reply Context Box (Req 4) -->
+  <div id="reply-context-box" data-reply-id="">
     <button id="reply-close-btn">&times;</button>
     <strong>Replying to...</strong>
     <p id="reply-context-text">Message preview...</p>
   </div>
   
-    <div id="input-row">
+  <!-- NEW: Wrapper for the main input row -->
+  <div id="input-row">
     <textarea id="msg" rows="2" placeholder="Type message..." autocomplete="off"></textarea>
     
     <div class="extra-buttons">
@@ -466,7 +474,8 @@
       <button id="upload-btn">🖼️</button>
       <div id="emoji-picker">
         <div class="emoji-grid">
-                    <button class="emoji-btn" data-emoji="😊">😊</button>
+          <!-- ... (All your emoji buttons are unchanged) ... -->
+          <button class="emoji-btn" data-emoji="😊">😊</button>
         <button class="emoji-btn" data-emoji="😂">😂</button>
         <button class="emoji-btn" data-emoji="🤣">🤣</button>
         <button class="emoji-btn" data-emoji="🥰">🥰</button>
@@ -488,7 +497,7 @@
         <button class="emoji-btn" data-emoji="💕">💕</button>
         <button class="emoji-btn" data-emoji="🎉">🎉</button>
         <button class="emoji-btn" data-emoji="🌹">🌹</button>
-CSS
+        <!-- NEW: Removed the stray "CSS" text that was here -->
         <button class="emoji-btn" data-emoji="🎶">🎶</button>
         <button class="emoji-btn" data-emoji="🥺">🥺</button>
         </div>
@@ -499,12 +508,14 @@ CSS
   </div>
 </div>
 
+<!-- NEW: Context Menu for Messages (Req 3, 4, 6) -->
 <div id="message-context-menu" data-message-id="">
   <button class="context-menu-btn" id="context-reply-btn">Reply</button>
   <button class="context-menu-btn" id="context-react-btn">React</button>
   <button class="context-menu-btn delete" id="context-delete-btn" style="display:none;">Delete</button>
 </div>
 
+<!-- NEW: Reaction Picker (Req 3) -->
 <div id="reaction-picker">
   <button class="reaction-picker-btn" data-emoji="❤️">❤️</button>
   <button class="reaction-picker-btn" data-emoji="👍">👍</button>
@@ -790,13 +801,15 @@ async function loadMessages(forceScroll = false) {
   chatContainer.innerHTML = "";
 
   // --- (Love/Goodnight animations unchanged) ---
-  const currentMessageIds = data.map((m, i) => `${m.sender}-${m.text}-${i}`);
+  const currentMessageIds = data.map((m, i) => `${m.id || i}-${m.text}`); // Use new ID
   const newMessages = data.filter((m, i) => {
-    const msgId = `${m.sender}-${m.text}-${i}`;
+    const msgId = `${m.id || i}-${m.text}`;
     return !lastProcessedMessages.includes(msgId);
   });
   const newLoveMessage = newMessages.some(m => m.text && /\blove\b/i.test(m.text));
-  const newGoodnightMessage = newMessages.some(m => m.text && /\b(goodnight|gn|gnsd|gntc|gnsdtc)\b/i.test(m.text));
+  const newGoodnightMessage = newMessages.some(m => 
+    m.text && /\b(goodnight|gn|gnsd|gntc|gnsdtc)\b/i.test(m.text)
+  );
   if (newLoveMessage) spawnLoveBubbles();
   if (newGoodnightMessage) spawnSleepBubbles();
   lastProcessedMessages = currentMessageIds;
@@ -809,19 +822,18 @@ async function loadMessages(forceScroll = false) {
   }
 
   data.forEach((m, i) => {
-    // NEW: Assume 'm.id' and 'm.timestamp' from backend
-    // m.id is CRITICAL for replies, deletes, reactions
-    // m.timestamp is for display (Req 2)
-    // m.reply_to_data = { sender: 'User', text: 'Hi' } (Req 4)
-    // m.reactions = [{emoji: '❤️', count: 1}] (Req 3)
+    // NEW: Use m.id, m.timestamp, m.reply_to_data, m.reactions from backend
     const m_id = m.id || `msg-${i}`; // Fallback ID
     const m_timestamp = m.timestamp || null;
 
     const d = document.createElement("div");
     d.className = "message " + (m.sender === "user" ? "user-msg" : "agent-msg");
     d.dataset.id = m_id; // NEW: Set message ID
-    d.dataset.text = m.text || (m.type === 'image' ? 'Image' : ''); // NEW: For reply context
-    d.dataset.sender = m.sender; // NEW: For reply context
+    // NEW: Set data for reply context
+    let contextText = m.text || (m.type === 'image' ? 'Image' : '');
+    if (m.type === 'deleted') contextText = 'Message was deleted';
+    d.dataset.text = contextText;
+    d.dataset.sender = m.sender;
 
     // NEW: Reply Context (Req 4)
     if (m.reply_to_data) {
@@ -850,7 +862,8 @@ async function loadMessages(forceScroll = false) {
       d.appendChild(img);
       d.appendChild(download);
     } else {
-      d.innerHTML += (m.text || "").replace(/\n/g, "<br>"); // NEW: Use += to append after reply
+      // NEW: Use innerHTML to append, respecting reply div
+      d.innerHTML += (m.text || "").replace(/\n/g, "<br>");
     }
 
     // Seen Tag
@@ -865,6 +878,8 @@ async function loadMessages(forceScroll = false) {
     }
   
     // NEW: Timestamp (Req 2)
+    // Don't show timestamp for deleted messages, or handle differently?
+    // For now, show it.
     const timestampSpan = document.createElement("span");
     timestampSpan.className = "message-timestamp";
     timestampSpan.textContent = formatTimestamp(m_timestamp);
@@ -879,14 +894,17 @@ async function loadMessages(forceScroll = false) {
     }
   
     // NEW: Options Button (Req 3, 4, 6)
-    const optionsBtn = document.createElement("button");
-    optionsBtn.className = "message-options-btn";
-    optionsBtn.innerHTML = "&hellip;";
-    optionsBtn.onclick = (e) => {
-      e.stopPropagation();
-      openMessageOptions(e, m_id, m.sender === 'user');
-    };
-    d.appendChild(optionsBtn);
+    // Only add if message is not deleted
+    if (m.type !== 'deleted') {
+      const optionsBtn = document.createElement("button");
+      optionsBtn.className = "message-options-btn";
+      optionsBtn.innerHTML = "&hellip;";
+      optionsBtn.onclick = (e) => {
+        e.stopPropagation();
+        openMessageOptions(e, m_id, m.sender === 'user');
+      };
+      d.appendChild(optionsBtn);
+    }
 
     chatContainer.appendChild(d);
   });
@@ -1111,7 +1129,7 @@ function openMessageOptions(e, messageId, isUserMessage) {
   let top = e.pageY;
   let left = e.pageX;
   
-  // Adjust if out of bounds
+A // Adjust if out of bounds
   if (top + menuHeight > window.innerHeight) {
     top = e.pageY - menuHeight;
   }
@@ -1133,7 +1151,7 @@ contextReactBtn.addEventListener("click", (e) => {
   messageContextMenu.style.display = "none";
   // Position and show reaction picker
   reactionPicker.style.display = "block";
-  const menuHeight = reactionPicker.offsetHeight;
+t const menuHeight = reactionPicker.offsetHeight;
   const menuWidth = reactionPicker.offsetWidth;
   let top = e.pageY - menuHeight - 10; // Show above cursor
   let left = e.pageX - (menuWidth / 2);
@@ -1149,6 +1167,7 @@ contextReactBtn.addEventListener("click", (e) => {
 contextDeleteBtn.addEventListener("click", (e) => {
   const msgId = messageContextMenu.dataset.messageId;
   messageContextMenu.style.display = "none";
+  // NEW: Use a custom modal/confirm, but window.confirm is a placeholder
   if (confirm("Are you sure you want to delete this message?")) {
     deleteMessage(msgId);
   }
@@ -1168,7 +1187,6 @@ async function sendReaction(messageId, emoji) {
   if (!messageId || !isLoggedIn) return;
   console.log(`Sending reaction ${emoji} to message ${messageId}`);
   // --- BACKEND REQUIRED ---
-  // This requires a new endpoint, e.g., /react
   await fetch(`${BACKEND_URL}/react`, {
     method: "POST",
     headers: {
@@ -1191,7 +1209,6 @@ async function deleteMessage(messageId) {
   if (!messageId || !isLoggedIn) return;
   console.log(`Deleting message ${messageId}`);
   // --- BACKEND REQUIRED ---
-  // This requires a new endpoint, e.g., /delete_message
   await fetch(`${BACKEND_URL}/delete_message`, {
     method: "POST",
     headers: {
