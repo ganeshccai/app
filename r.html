@@ -257,7 +257,7 @@
   </div>
 </div>
 
-<div id="lock-overlay" style="display:none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(220, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; z-index: 1000; color: white; text-align: center; font-size: 22px; font-weight: bold; padding: 20px;">
+<div id="lock-overlay" style="display:none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(220, 0, 0, 0.85); justify-content: center; align-items: center; z-index: 1000; color: white; text-align: center; font-size: 22px; font-weight: bold; padding: 20px;">
   <div>
     🚫 Session Locked
     <p style="font-size: 18px; font-weight: normal; margin-top: 15px;">This application is already open and active in another tab.<br>Please close this tab.</p>
@@ -1321,6 +1321,29 @@ function setUnreadBadge(count) {
       document.title = document.title.replace(/^\(\d+\)\s*/, '');
     }
   } catch (e) { /* ignore */ }
+}
+
+// Force-clear any leftover lock keys and hide the lock overlay so user can login again
+function forceClearLock(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  try {
+    // Remove any localStorage keys that look like locks (defensive)
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (k.toLowerCase().includes('lock')) {
+        localStorage.removeItem(k);
+      }
+    }
+  } catch (err) {
+    console.warn('forceClearLock localStorage cleanup failed', err);
+  }
+
+  const lo = document.getElementById('lock-overlay');
+  if (lo) lo.style.display = 'none';
+  // Show login so user can re-authenticate
+  try { showLoginScreen(); } catch (e2) { /* ignore */ }
+  return false;
 }
 
 const notificationManager = {
