@@ -604,10 +604,11 @@ function startPolling() {
 
 async function sendMessage() {
   const text = msgInput.value.trim();
-  if (!text || !isLoggedIn || !sessionToken || !isThisTabActive) return;
+  if (!text) return;
 
-  // If we're editing an existing message
+  // If editing, require login/sessionToken (editing must be authenticated)
   if (editingMessageId) {
+    if (!sessionToken) { alert('Login required to edit messages'); return; }
     try {
       await fetch(`${BACKEND_URL}/edit_message`, {
         method: 'POST',
@@ -619,17 +620,23 @@ async function sendMessage() {
       });
     } catch (e) { console.error('Edit failed', e); }
     editingMessageId = null;
-    // clear edit UI if any
     const editIndicator = document.getElementById('edit-indicator'); if (editIndicator) editIndicator.remove();
   } else {
-    // Regular send, attach reply_to if present
+    // Sending: allow unauthenticated sends (backend may accept public posts).
     const payload = { chat_id: chatId, sender: 'user', text };
     if (replyTo) payload.reply_to = replyTo;
-    await fetch(`${BACKEND_URL}/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-      body: JSON.stringify(payload)
-    });
+    const headers = { 'Content-Type': 'application/json' };
+    if (sessionToken) headers['Authorization'] = `Bearer ${sessionToken}`;
+    try {
+      await fetch(`${BACKEND_URL}/send`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+    } catch (e) {
+      console.error('Send failed', e);
+      alert('Failed to send message. See console for details.');
+    }
     replyTo = null;
     const r = document.getElementById('reply-indicator'); if (r) r.remove();
   }
