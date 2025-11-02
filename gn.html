@@ -1,156 +1,363 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
-  <title>Agent Chat</title>
-  <style>
-    :root {
-      --accent: #3b82f6;
-      --accent2: #2563eb;
-      --bg: #f3f6fb;
-      --bubble-user: #ffffff;
-      --bubble-agent: #dbeafe;
-      --user-border: #dcdcdc;
-    }
-    html, body {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-    }
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      display: flex;
-      flex-direction: column;
-      background: var(--bg);
-      color: #333;
-    }
-    header {
-      background: linear-gradient(90deg, var(--accent), var(--accent2));
-      color: white;
-      padding: 14px;
-      text-align: center;
-      font-weight: bold;
-      font-size: 20px;
-      position: relative;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-    #user-status {
-      position: absolute;
-      right: 14px;
-      top: 14px;
-      font-weight: bold;
-    }
-    #chat-container {
-      flex: 1;
-      overflow-y: auto;
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-      background: #f8f9fb;
-    }
-    .message {
-      margin: 6px 0;
-      padding: 10px 14px;
-      border-radius: 14px;
-      max-width: 80%;
-      word-wrap: break-word;
-      font-size: 15px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .user-msg {
-      background: var(--bubble-user);
-      border: 1px solid var(--user-border);
-      align-self: flex-start;
-    }
-    .agent-msg {
-      background: var(--bubble-agent);
-      align-self: flex-end;
-    }
-    #input-container {
-      display: flex;
-      gap: 10px;
-      padding: 12px;
-      background: #fff;
-      border-top: 1px solid #ccc;
-    }
-    #msg {
-      flex: 1;
-      resize: none;
-      border-radius: 14px;
-      padding: 12px;
-      border: 1px solid #ccc;
-      font-size: 16px;
-      outline: none;
-      max-height: 120px;
-    }
-    #msg:focus {
-      border-color: var(--accent);
-    }
-    button {
-      padding: 12px 16px;
-      background: var(--accent2);
-      color: white;
-      border: none;
-      border-radius: 14px;
-      cursor: pointer;
-      font-size: 16px;
-      transition: background 0.3s ease;
-    }
-    button:hover {
-      background: #1e40af;
-    }
-    button:active {
-      opacity: 0.9;
-    }
-    #login-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(255,255,255,0.95);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 999;
-    }
-    #login-box {
-      background: #fff;
-      padding: 24px;
-      border-radius: 12px;
-      box-shadow: 0 0 12px rgba(0,0,0,0.1);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      width: 280px;
-    }
-    #login-box input {
-      padding: 10px;
-      font-size: 16px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      outline: none;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+  <title>Agent Chat</title>
+  <style>
+    :root {
+      --accent: #3b82f6;
+      --accent2: #2563eb;
+      --bg: #f3f6fb;
+      --bubble-user: #ffffff;
+      --bubble-agent: #dbeafe;
+      --user-border: #dcdcdc;
+    }
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      color: #333;
+    }
+    header {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      color: white;
+      padding: 14px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 20px;
+      position: relative;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    #user-status {
+      position: absolute;
+      right: 14px;
+      top: 14px;
+      font-weight: bold;
+    }
+    #chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      background: #f8f9fb;
+      /* NEW: Added smooth scrolling */
+      scroll-behavior: smooth;
+    }
+    .message {
+      margin: 6px 0;
+      padding: 10px 14px;
+      border-radius: 14px;
+      max-width: 80%;
+      word-wrap: break-word;
+      font-size: 15px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      /* NEW: Added for positioning options button */
+      position: relative;
+    }
+    .user-msg {
+      background: var(--bubble-user);
+      border: 1px solid var(--user-border);
+      align-self: flex-start;
+    }
+    .agent-msg {
+      background: var(--bubble-agent);
+      align-self: flex-end;
+    }
+    
+    /* NEW: Styles for Timestamp (Req 2) */
+    .message-timestamp {
+      font-size: 11px;
+      color: #888;
+      margin-top: 5px;
+      text-align: right;
+      display: block;
+      clear: both;
+    }
+    .agent-msg .message-timestamp {
+      color: #666;
+    }
+    
+    /* NEW: Styles for Reply-To Context (Req 4) */
+    .message-reply-context {
+      background: rgba(0,0,0,0.05);
+      border-left: 3px solid var(--accent2); /* Use agent theme color */
+      padding: 6px 8px;
+      margin: -4px -8px 8px -8px;
+      border-radius: 4px 4px 0 0;
+      font-size: 13px;
+    }
+    .reply-context-sender {
+      font-weight: bold;
+      color: var(--accent2);
+    }
+    .reply-context-text {
+      color: #555;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+    }
+    
+    /* NEW: Styles for Reactions (Req 3) */
+    .message-reactions {
+      position: absolute;
+      bottom: -10px;
+      left: 6px; /* Default for user messages */
+      background: #fff;
+      border: 1px solid #eee;
+      border-radius: 10px;
+      padding: 1px 4px;
+      font-size: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .agent-msg .message-reactions {
+      right: 6px; /* For agent messages */
+      left: auto;
+    }
+    
+    /* NEW: Styles for Message Options Button (Req 3, 4, 6) */
+    .message-options-btn {
+      position: absolute;
+      top: 2px;
+      right: -28px; /* Default for user messages */
+      background: #f0f0f0;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      line-height: 24px;
+      text-align: center;
+      font-size: 16px;
+      color: #888;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .agent-msg .message-options-btn {
+      left: -28px; /* For agent messages */
+      right: auto;
+    }
+    .message:hover .message-options-btn {
+      opacity: 1;
+    }
+    
+    #input-container {
+      display: flex;
+      flex-direction: column; /* NEW: Changed to column for reply box */
+      gap: 0;
+      padding: 0;
+      background: #fff;
+      border-top: 1px solid #ccc;
+      max-height: 200px; /* NEW: Increased max-height */
+    }
+    
+    /* NEW: Styles for Reply Context Box (Req 4) */
+    #reply-context-box {
+      padding: 8px 12px;
+      background: #f0f0f0;
+      border-bottom: 1px solid #ddd;
+      font-size: 13px;
+      position: relative;
+      display: none; /* Hidden by default */
+    }
+    #reply-context-box strong {
+      color: var(--accent2);
+    }
+    #reply-context-box p {
+      margin: 0;
+      color: #555;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #reply-close-btn {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      background: none;
+      border: none;
+      font-size: 20px;
+      color: #888;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+    
+    /* NEW: Wrapper for the main input row */
+    #input-row {
+      display: flex;
+      gap: 10px;
+      padding: 12px;
+    }
+    
+    #msg {
+      flex: 1;
+      resize: none;
+      border-radius: 14px;
+      padding: 12px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+      outline: none;
+      max-height: 120px;
+    }
+    #msg:focus {
+      border-color: var(--accent);
+    }
+    button {
+      padding: 12px 16px;
+      background: var(--accent2);
+      color: white;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background 0.3s ease;
+    }
+    button:hover {
+      background: #1e40af;
+    }
+    button:active {
+      opacity: 0.9;
+    }
+    #login-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,0.95);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+    #login-box {
+      background: #fff;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 0 12px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 280px;
+    }
+    #login-box input {
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      outline: none;
+    }
+    
+    /* NEW: Styles for Message Context Menu (Req 3, 4, 6) */
+    #message-context-menu {
+      position: fixed;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1001;
+      display: none;
+      overflow: hidden;
+    }
+    .context-menu-btn {
+      display: block;
+      width: 100%;
+      padding: 10px 16px;
+      background: none;
+      border: none;
+      color: #333;
+      text-align: left;
+      font-size: 14px;
+      cursor: pointer;
+      min-width: 120px;
+    }
+    .context-menu-btn:hover {
+      background: #f5f5f5;
+      color: #000;
+    }
+    .context-menu-btn.delete {
+      color: #d9534f;
+    }
+    .context-menu-btn.delete:hover {
+      background: #f8d7da;
+    }
+    
+    /* NEW: Styles for Reaction Picker (Req 3) */
+    #reaction-picker {
+      position: fixed;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1002;
+      display: none;
+      padding: 6px;
+    }
+    .reaction-picker-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 8px;
+      transition: transform 0.1s ease, background 0.2s;
+    }
+    .reaction-picker-btn:hover {
+      transform: scale(1.2);
+      background: #f0f0f0;
+    }
+  </style>
 </head>
 <body data-chat-id="1234">
 
 <div id="login-overlay">
-  <div id="login-box">
-    <input type="password" id="pwd" placeholder="Enter password" />
-    <button onclick="checkPwd()">Login ➡️</button>
-    <div id="login-msg" style="color:red;"></div>
-  </div>
+  <div id="login-box">
+    <input type="password" id="pwd" placeholder="Enter password" />
+    <button onclick="checkPwd()">Login ➡️</button>
+    <div id="login-msg" style="color:red;"></div>
+  </div>
 </div>
 
-<header>Agent Chat <span id="user-status">🔴</span></header>
+<header>रेश्मा जंगले<span id="user-status">🔴</span></header>
 <div id="chat-container"></div>
+
 <div id="input-container">
-  <textarea id="msg" rows="2" placeholder="Type reply..." autocomplete="off"></textarea>
-  <button id="send-btn">Send</button>
-  <button id="clear-btn">Clear</button>
-  <input type="file" id="file-input" accept="image/*" style="display:none" />
-  <button id="upload-btn">📎</button>
+    <div id="reply-context-box" data-reply-id="">
+    <button id="reply-close-btn">&times;</button>
+    <strong>Replying to...</strong>
+    <p id="reply-context-text">Message preview...</p>
+  </div>
+  
+    <div id="input-row">
+    <textarea id="msg" rows="2" placeholder="Type reply..." autocomplete="off"></textarea>
+    <button id="send-btn">Send</button>
+    <button id="clear-btn">Clear</button>
+    <input type="file" id="file-input" accept="image/*" style="display:none" />
+    <button id="upload-btn">📎</button>
+  </div>
 </div>
+
+<div id="message-context-menu" data-message-id="">
+  <button class="context-menu-btn" id="context-reply-btn">Reply</button>
+  <button class="context-menu-btn" id="context-react-btn">React</button>
+  <button class="context-menu-btn delete" id="context-delete-btn" style="display:none;">Delete</button>
+</div>
+
+<div id="reaction-picker">
+  <button class="reaction-picker-btn" data-emoji="❤️">❤️</button>
+  <button class="reaction-picker-btn" data-emoji="👍">👍</button>
+  <button class="reaction-picker-btn" data-emoji="😂">😂</button>
+  <button class="reaction-picker-btn" data-emoji="😮">😮</button>
+  <button class="reaction-picker-btn" data-emoji="😢">😢</button>
+  <button class="reaction-picker-btn" data-emoji="🙏">🙏</button>
+</div>
+
 <script>
 const BACKEND_URL = "https://app-788207962975.us-central1.run.app";
 const chatId = document.body.dataset.chatId || "1234";
@@ -163,197 +370,312 @@ const userStatus = document.getElementById("user-status");
 const uploadBtn = document.getElementById("upload-btn");
 const fileInput = document.getElementById("file-input");
 
+// NEW: Element references for new features
+const replyContextBox = document.getElementById("reply-context-box");
+const replyContextText = document.getElementById("reply-context-text");
+const replyCloseBtn = document.getElementById("reply-close-btn");
+const messageContextMenu = document.getElementById("message-context-menu");
+const reactionPicker = document.getElementById("reaction-picker");
+const contextReplyBtn = document.getElementById("context-reply-btn");
+const contextReactBtn = document.getElementById("context-react-btn");
+const contextDeleteBtn = document.getElementById("context-delete-btn");
+
 let isLoggedIn = false;
 let sessionToken = null;
+// NEW: For title notifications (Req 5)
+let originalTitle = document.title;
+let newMessagesCount = 0;
+let lastProcessedMessageIds = []; // NEW: For tracking new messages
 
 async function checkPwd() {
-  const pwd = document.getElementById("pwd").value;
-  const res = await fetch(`${BACKEND_URL}/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, password: pwd, sender: "agent" })
-  });
+  const pwd = document.getElementById("pwd").value;
+  const res = await fetch(`${BACKEND_URL}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, password: pwd, sender: "agent" })
+  });
 
-  const data = await res.json();
-  if (data.success) {
-    sessionToken = data.session_token;
-    document.getElementById("login-overlay").style.display = "none";
-    isLoggedIn = true;
-    startPolling();
-  } else {
-    document.getElementById("login-msg").textContent = data.error || "Login failed";
-  }
+  const data = await res.json();
+  if (data.success) {
+    sessionToken = data.session_token;
+    document.getElementById("login-overlay").style.display = "none";
+    isLoggedIn = true;
+    startPolling();
+  } else {
+    document.getElementById("login-msg").textContent = data.error || "Login failed";
+  }
 }
 
 function startPolling() {
-  markOnline();
-  checkStatus();
-  loadMessages();
-  loadTyping();
-  setInterval(loadMessages, 1000);
-  setInterval(checkStatus, 1000);
-  setInterval(loadTyping, 500);
-  setInterval(() => {
-    if (document.visibilityState === "visible") markOnline();
-  }, 2000);
+  markOnline();
+  checkStatus();
+  loadMessages();
+  loadTyping();
+  setInterval(loadMessages, 1000);
+  setInterval(checkStatus, 1000);
+  setInterval(loadTyping, 500);
+  setInterval(() => {
+    if (document.visibilityState === "visible") markOnline();
+  }, 2000);
 }
 
 async function sendMessage() {
-  const text = msgInput.value.trim();
-  if (!text || !isLoggedIn || !sessionToken) return;
+  const text = msgInput.value.trim();
+  if (!text || !isLoggedIn || !sessionToken) return;
 
-  await fetch(`${BACKEND_URL}/send`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
-    },
-    body: JSON.stringify({ chat_id: chatId, sender: "agent", text })
-  });
+  // NEW: Check for active reply (Req 4)
+  const replyToId = replyContextBox.dataset.replyId || null;
+  
+  const messageData = {
+    chat_id: chatId,
+    sender: "agent",
+    text: text
+  };
 
-  msgInput.value = "";
-  await sendTyping("");
-  loadMessages();
+  // NEW: Add reply_to_id if it exists
+  if (replyToId) {
+    messageData.reply_to_id = replyToId;
+  }
+
+  await fetch(`${BACKEND_URL}/send`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify(messageData) // NEW: Send new messageData
+  });
+
+  msgInput.value = "";
+  clearReplyContext(); // NEW: Clear reply box after sending
+  await sendTyping("");
+  loadMessages(true); // NEW: Pass 'true' to force scroll
 }
 
-async function loadMessages() {
-  if (!isLoggedIn) return;
-  const isTabActive = document.visibilityState === "visible";
-  const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=agent&active=${isTabActive}`);
-  const data = await res.json();
-  chatContainer.innerHTML = "";
+// NEW: Helper function for timestamps (Req 2)
+function formatTimestamp(isoString) {
+  if (!isoString) return "";
+  try {
+    const date = new Date(isoString);
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  } catch (e) {
+    console.warn("Could not parse timestamp:", isoString);
+    return "";
+  }
+}
 
-  data.forEach((m, i) => {
-    const d = document.createElement("div");
-    d.className = "message " + (m.sender === "user" ? "user-msg" : "agent-msg");
+async function loadMessages(forceScroll = false) {
+  if (!isLoggedIn) return;
+  
+  // NEW: Smart Scrolling (Req 1)
+  // Check if user is scrolled near the bottom *before* loading
+  const isNearBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 50;
 
-    if (m.type === "image" && m.url) {
-      const img = document.createElement("img");
-      img.src = m.url;
-      img.style.maxWidth = "240px";
-      img.style.borderRadius = "12px";
-      img.style.display = "block";
-      img.style.marginBottom = "6px";
+  const isTabActive = document.visibilityState === "visible";
+  const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=agent&active=${isTabActive}`);
+  const data = await res.json();
+  chatContainer.innerHTML = "";
+  
+  // NEW: Logic for Title Notifications (Req 5)
+  const currentMessageIds = data.map(m => m.id || m.timestamp); // Use ID or timestamp
+  const newMessages = data.filter(m => !lastProcessedMessageIds.includes(m.id || m.timestamp));
+  
+  if (newMessages.length > 0 && document.hidden) {
+    newMessagesCount += newMessages.length;
+    document.title = `(${newMessagesCount}) New Message - ${originalTitle}`;
+  }
+  lastProcessedMessageIds = currentMessageIds;
+  // ---
 
-      const download = document.createElement("a");
-      download.href = m.url;
-      download.download = "image.jpg";
-      download.textContent = "⬇️";
-      download.style.fontSize = "14px";
-      download.style.textDecoration = "none";
-      download.style.color = "#555";
+  data.forEach((m, i) => {
+    // NEW: Assume 'm.id' and 'm.timestamp' from backend
+    const m_id = m.id || `msg-${i}`; // Fallback ID
+    const m_timestamp = m.timestamp || null;
 
-      d.appendChild(img);
-      d.appendChild(download);
-    } else {
-      d.innerHTML = (m.text || "").replace(/\n/g, "<br>");
-    }
+    const d = document.createElement("div");
+    d.className = "message " + (m.sender === "user" ? "user-msg" : "agent-msg");
+    d.dataset.id = m_id; // NEW: Set message ID
+    d.dataset.text = m.text || (m.type === 'image' ? 'Image' : ''); // NEW: For reply context
+    d.dataset.sender = m.sender; // NEW: For reply context
+  
+    // NEW: Reply Context (Req 4)
+    if (m.reply_to_data) {
+      const replyDiv = document.createElement("div");
+      replyDiv.className = "message-reply-context";
+      replyDiv.innerHTML = `
+        <div class="reply-context-sender">${m.reply_to_data.sender === 'agent' ? 'You' : 'User'}</div>
+        <div class="reply-context-text">${m.reply_to_data.text}</div>
+      `;
+      d.appendChild(replyDiv);
+    }
 
-    const isLast = i === data.length - 1;
-    if (m.sender === "agent" && m.seen_by === "user" && isLast) {
-      const seenTag = document.createElement("div");
-      seenTag.style.fontSize = "12px";
-      seenTag.style.color = "#888";
-      seenTag.style.marginTop = "4px";
-      seenTag.textContent = "Seen ✅";
-      d.appendChild(seenTag);
-    }
+    // Image/Text content
+    if (m.type === "image" && m.url) {
+      const img = document.createElement("img");
+      img.src = m.url;
+      img.style.maxWidth = "240px";
+      img.style.borderRadius = "12px";
+      img.style.display = "block";
+      img.style.marginBottom = "6px";
 
-    chatContainer.appendChild(d);
-  });
+      const download = document.createElement("a");
+      download.href = m.url;
+      download.download = "image.jpg";
+      download.textContent = "⬇️";
+      download.style.fontSize = "14px";
+      download.style.textDecoration = "none";
+      download.style.color = "#555";
 
-  chatContainer.scrollTop = chatContainer.scrollHeight;
+      d.appendChild(img);
+      d.appendChild(download);
+    } else {
+      d.innerHTML += (m.text || "").replace(/\n/g, "<br>"); // NEW: Use +=
+    }
+
+    // Seen Tag
+    const isLast = i === data.length - 1;
+    if (m.sender === "agent" && m.seen_by === "user" && isLast) {
+      const seenTag = document.createElement("div");
+      seenTag.style.fontSize = "12px";
+      seenTag.style.color = "#888";
+      seenTag.style.marginTop = "4px";
+      seenTag.textContent = "Seen ✅";
+      d.appendChild(seenTag);
+    }
+    
+    // NEW: Timestamp (Req 2)
+    const timestampSpan = document.createElement("span");
+    timestampSpan.className = "message-timestamp";
+    timestampSpan.textContent = formatTimestamp(m_timestamp);
+    d.appendChild(timestampSpan);
+    
+    // NEW: Reactions (Req 3)
+    if (m.reactions && m.reactions.length > 0) {
+      const reactionsDiv = document.createElement("div");
+      reactionsDiv.className = "message-reactions";
+      reactionsDiv.textContent = m.reactions.map(r => r.emoji + (r.count > 1 ? r.count : "")).join(" ");
+      d.appendChild(reactionsDiv);
+    }
+    
+    // NEW: Options Button (Req 3, 4, 6)
+    const optionsBtn = document.createElement("button");
+    optionsBtn.className = "message-options-btn";
+    optionsBtn.innerHTML = "&hellip;";
+    optionsBtn.onclick = (e) => {
+      e.stopPropagation();
+      // Show delete only if m.sender is 'agent'
+      openMessageOptions(e, m_id, m.sender === 'agent');
+    };
+    d.appendChild(optionsBtn);
+
+    chatContainer.appendChild(d);
+  });
+
+  // NEW: Smart Scrolling (Req 1)
+  // Only scroll if we were near bottom OR if we just sent a message
+  if (isNearBottom || forceScroll) {
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
 }
 
 async function loadTyping() {
-  if (!isLoggedIn) return;
-  const res = await fetch(`${BACKEND_URL}/get_live_typing/${chatId}`);
-  const d = await res.json();
+  if (!isLoggedIn) return;
+  
+  // NEW: Smart Scrolling (Req 1)
+  const isNearBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 50;
 
-  const oldTyping = document.getElementById("user-typing-indicator");
-  if (oldTyping) oldTyping.remove();
+  const res = await fetch(`${BACKEND_URL}/get_live_typing/${chatId}`);
+  const d = await res.json();
 
-  if (d.sender === "user" && d.text) {
-    const typingMsg = document.createElement("div");
-    typingMsg.id = "user-typing-indicator";
-    typingMsg.className = "message user-msg";
-    typingMsg.innerHTML = d.text.replace(/\n/g, "<br>");
-    chatContainer.appendChild(typingMsg);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-  }
+  const oldTyping = document.getElementById("user-typing-indicator");
+  if (oldTyping) oldTyping.remove();
+
+  if (d.sender === "user" && d.text) {
+    const typingMsg = document.createElement("div");
+    typingMsg.id = "user-typing-indicator";
+    typingMsg.className = "message user-msg";
+    typingMsg.innerHTML = d.text.replace(/\n/g, "<br>");
+    chatContainer.appendChild(typingMsg);
+    
+    // NEW: Smart Scrolling (Req 1)
+    if (isNearBottom) {
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+  }
 }
 
 async function sendTyping(text) {
-  if (!isLoggedIn) return;
-  await fetch(`${BACKEND_URL}/live_typing`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
-    },
-    body: JSON.stringify({ chat_id: chatId, sender: "agent", text })
-  });
+  if (!isLoggedIn) return;
+  await fetch(`${BACKEND_URL}/live_typing`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify({ chat_id: chatId, sender: "agent", text })
+  });
 }
 
 async function checkStatus() {
-  if (!isLoggedIn) return;
-  const res = await fetch(`${BACKEND_URL}/is_online/${chatId}?t=${Date.now()}`);
-  const d = await res.json();
-  const emoji = d.user_online ? "🟢" : "🔴";
-  const time = d.user_online ? "" : `${d.user_last_seen}`;
-  userStatus.textContent = `${emoji}${time}`;
+  if (!isLoggedIn) return;
+  const res = await fetch(`${BACKEND_URL}/is_online/${chatId}?t=${Date.now()}`);
+  const d = await res.json();
+  const emoji = d.user_online ? "🟢" : "🔴";
+  const time = d.user_online ? "" : `${d.user_last_seen}`;
+  userStatus.textContent = `${emoji}${time}`;
 }
 
 async function clearChat() {
-  if (!isLoggedIn) return;
-  await fetch(`${BACKEND_URL}/clear_chat/${chatId}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
-    },
-    body: JSON.stringify({ sender: "agent" })
-  });
-  chatContainer.innerHTML = "";
+  if (!isLoggedIn) return;
+  await fetch(`${BACKEND_URL}/clear_chat/${chatId}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify({ sender: "agent" })
+  });
+  chatContainer.innerHTML = "";
+  lastProcessedMessageIds = []; // NEW: Reset message tracking
 }
 
 async function markOnline() {
-  if (!isLoggedIn) return;
-  await fetch(`${BACKEND_URL}/mark_online`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
-    },
-    body: JSON.stringify({ chat_id: chatId, sender: "agent" })
-  });
+  if (!isLoggedIn) return;
+  await fetch(`${BACKEND_URL}/mark_online`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify({ chat_id: chatId, sender: "agent" })
+  });
 }
 
 uploadBtn.addEventListener("click", () => fileInput.click());
 
 fileInput.addEventListener("change", async () => {
-  const file = fileInput.files[0];
-  if (!file || !isLoggedIn || !sessionToken) return;
+  const file = fileInput.files[0];
+  if (!file || !isLoggedIn || !sessionToken) return;
 
-  const reader = new FileReader();
-  reader.onload = async () => {
-    const base64 = reader.result;
-    await fetch(`${BACKEND_URL}/send`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${sessionToken}`
-      },
-      body: JSON.stringify({
-        chat_id: chatId,
-        sender: "agent",
-        type: "image",
-        url: base64
-      })
-    });
-    loadMessages();
-  };
-  reader.readAsDataURL(file);
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const base64 = reader.result;
+    await fetch(`${BACKEND_URL}/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${sessionToken}`
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        sender: "agent",
+        type: "image",
+        url: base64
+      })
+    });
+    loadMessages(true); // NEW: Force scroll
+  };
+  reader.readAsDataURL(file);
 });
 
 sendBtn.addEventListener("mousedown", e => e.preventDefault());
@@ -361,23 +683,173 @@ sendBtn.addEventListener("click", sendMessage);
 clearBtn.addEventListener("click", clearChat);
 msgInput.addEventListener("input", e => sendTyping(e.target.value));
 
+// NEW: Close all popups on body click
+document.addEventListener("click", (e) => {
+  if (!messageContextMenu.contains(e.target)) {
+    messageContextMenu.style.display = "none";
+  }
+  if (!reactionPicker.contains(e.target)) {
+    reactionPicker.style.display = "none";
+  }
+});
+
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") {
-    markOnline();
-    loadMessages();
-  }
+  if (document.visibilityState === "visible") {
+    // NEW: Reset title on visibility (Req 5)
+    document.title = originalTitle;
+    newMessagesCount = 0;
+    
+    markOnline();
+    loadMessages();
+  }
 });
 
 window.addEventListener("beforeunload", () => {
-  try {
-    const data = JSON.stringify({ chat_id: chatId, sender: "agent" });
-    const blob = new Blob([data], { type: "application/json" });
-    navigator.sendBeacon(`${BACKEND_URL}/logout_agent`, blob);
-  } catch (e) {
-    console.warn("Logout beacon failed:", e);
-  }
+  try {
+    const data = JSON.stringify({ chat_id: chatId, sender: "agent" });
+    const blob = new Blob([data], { type: "application/json" });
+    navigator.sendBeacon(`${BACKEND_URL}/logout_agent`, blob);
+  } catch (e) {
+    console.warn("Logout beacon failed:", e);
+  }
 });
+
+
+// --- *** NEW: FUNCTIONS & LISTENERS FOR FEATURES *** ---
+
+// NEW: Reply Context (Req 4)
+function showReplyContext(messageId) {
+  const messageEl = document.querySelector(`.message[data-id="${messageId}"]`);
+  if (!messageEl) return;
+  
+  // NEW: Adapted for agent's view
+  const sender = messageEl.dataset.sender === 'agent' ? 'You' : 'User';
+  const text = messageEl.dataset.text;
+  
+  replyContextText.textContent = text;
+  replyContextBox.querySelector('strong').textContent = `Replying to ${sender}`;
+  replyContextBox.dataset.replyId = messageId;
+  replyContextBox.style.display = "block";
+  messageContextMenu.style.display = "none"; // Hide menu
+  msgInput.focus();
+}
+
+function clearReplyContext() {
+  replyContextBox.style.display = "none";
+  replyContextBox.dataset.replyId = "";
+}
+replyCloseBtn.addEventListener("click", clearReplyContext);
+
+
+// NEW: Message Options (Req 3, 4, 6)
+function openMessageOptions(e, messageId, isAgentMessage) {
+  // Set ID for all buttons
+  messageContextMenu.dataset.messageId = messageId;
+  
+  // Toggle delete button visibility (show if it's agent's message)
+  contextDeleteBtn.style.display = isAgentMessage ? "block" : "none";
+  
+  // Position and show menu
+  messageContextMenu.style.display = "block";
+  const menuHeight = messageContextMenu.offsetHeight;
+  const menuWidth = messageContextMenu.offsetWidth;
+  let top = e.pageY;
+  let left = e.pageX;
+  
+  // Adjust if out of bounds
+  if (top + menuHeight > window.innerHeight) {
+    top = e.pageY - menuHeight;
+  }
+  if (left + menuWidth > window.innerWidth) {
+    left = e.pageX - menuWidth;
+  }
+  
+  messageContextMenu.style.top = `${top}px`;
+  messageContextMenu.style.left = `${left}px`;
+}
+
+// NEW: Context Menu Listeners
+contextReplyBtn.addEventListener("click", (e) => {
+  const msgId = messageContextMenu.dataset.messageId;
+  showReplyContext(msgId);
+});
+
+contextReactBtn.addEventListener("click", (e) => {
+  messageContextMenu.style.display = "none";
+  // Position and show reaction picker
+  reactionPicker.style.display = "block";
+  const menuHeight = reactionPicker.offsetHeight;
+  const menuWidth = reactionPicker.offsetWidth;
+  let top = e.pageY - menuHeight - 10; // Show above cursor
+  let left = e.pageX - (menuWidth / 2);
+  
+  if (top < 0) top = e.pageY + 10;
+  if (left < 0) left = 0;
+  if (left + menuWidth > window.innerWidth) left = window.innerWidth - menuWidth;
+
+  reactionPicker.style.top = `${top}px`;
+  reactionPicker.style.left = `${left}px`;
+});
+
+contextDeleteBtn.addEventListener("click", (e) => {
+  const msgId = messageContextMenu.dataset.messageId;
+  messageContextMenu.style.display = "none";
+  if (confirm("Are you sure you want to delete this message?")) {
+    deleteMessage(msgId);
+T }
+});
+
+// NEW: Reaction Picker Listeners (Req 3)
+document.querySelectorAll(".reaction-picker-btn").forEach(btn => {
+  btn.addEventListener("click", (e) => {
+    const emoji = btn.dataset.emoji;
+    const messageId = messageContextMenu.dataset.messageId; // Get from original context menu
+    reactionPicker.style.display = "none";
+    sendReaction(messageId, emoji);
+  });
+});
+
+async function sendReaction(messageId, emoji) {
+  if (!messageId || !isLoggedIn) return;
+  console.log(`Sending reaction ${emoji} to message ${messageId}`);
+  // --- BACKEND REQUIRED ---
+  await fetch(`${BACKEND_URL}/react`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+      emoji: emoji,
+      sender: "agent" // NEW: Send as agent
+    })
+  });
+  // Refresh messages to show new reaction
+  loadMessages();
+}
+
+// NEW: Delete Message (Req 6)
+async function deleteMessage(messageId) {
+  if (!messageId || !isLoggedIn) return;
+  console.log(`Deleting message ${messageId}`);
+  // --- BACKEND REQUIRED ---
+  await fetch(`${BACKEND_URL}/delete_message`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+      sender: "agent" // NEW: Send as agent
+    })
+  });
+  // Refresh messages to remove deleted one
+  loadMessages();
+}
 </script>
 </body>
 </html>
-  
