@@ -277,11 +277,14 @@
     <strong>Debug</strong>
     <button id="debug-close" style="background:transparent;border:1px solid rgba(255,255,255,0.2);color:#fff;padding:2px 6px;border-radius:6px;">✕</button>
   </div>
-  <div id="debug-body">Initializing...</div>
+  <div id="debug-body">Debug: use DiagSend / TestCORS / PingBackend. If send fails, copy this panel and the Network POST /send request (status + response body) and paste them here for help.</div>
   <div style="margin-top:6px;display:flex;gap:6px">
     <button id="debug-refresh">Refresh</button>
     <button id="debug-load">LoadMsgs</button>
     <button id="debug-unlock">ForceUnlock</button>
+    <button id="debug-diag">DiagSend</button>
+    <button id="debug-httpbin">TestCORS</button>
+    <button id="debug-ping">PingBackend</button>
   </div>
 </div>
 <div id="chat-container"></div>
@@ -1036,12 +1039,68 @@ document.addEventListener('DOMContentLoaded', () => {
 
       function updateDebug() {
         const lockVal = (() => { try { return localStorage.getItem(LOCK_KEY); } catch(e){return 'err'; }})();
-        dbgBody.innerHTML = `lock=${lockVal ? lockVal : 'null'}<br>isLoggedIn=${isLoggedIn}<br>isThisTabActive=${isThisTabActive}<br>sessionToken=${sessionToken? 'yes':'no'}<br>userNearBottom=${userNearBottom}<br>lastMessageCount=${lastMessageCount}<br>lastProcessed=${lastProcessedMessages.length}<br>publicPoll=${publicUnreadInterval? 'running':'stopped'}`;
+        dbgBody.innerHTML = `lock=${lockVal ? lockVal : 'null'}<br>isLoggedIn=${isLoggedIn}<br>isThisTabActive=${isThisTabActive}<br>sessionToken=${sessionToken? 'yes':'no'}<br>userNearBottom=${userNearBottom}<br>lastMessageCount=${lastMessageCount}<br>lastProcessed=${lastProcessedMessages.length}<br>publicPoll=${publicUnreadInterval? 'running':'stopped'}<br>href=${location.href}<br>origin=${location.origin}<br>online=${navigator.onLine}`;
       }
 
       dbgRefresh.addEventListener('click', updateDebug);
       dbgLoad.addEventListener('click', () => { loadMessages(); updateDebug(); });
       dbgUnlock.addEventListener('click', (e) => { forceClearLock(e); setTimeout(updateDebug,500); });
+      // Diagnostic: attempt a direct POST to /send and show detailed result
+      const dbgDiag = document.getElementById('debug-diag');
+      dbgDiag.addEventListener('click', async () => {
+        const out = document.getElementById('debug-body');
+        out.innerHTML += `<br>diag: attempting POST /send`;
+        const payload = { chat_id: chatId, sender: 'user', text: 'DIAG_TEST from client at ' + Date.now() };
+        try {
+          const t0 = performance.now();
+          const res = await fetch(`${BACKEND_URL}/send`, { method: 'POST', mode: 'cors', credentials: 'include', headers: { 'Content-Type':'application/json', 'X-DIAG':'1' }, body: JSON.stringify(payload) });
+          const t1 = performance.now();
+          let body = '';
+          try { body = await res.text(); } catch (e) { body = '<<no body read: '+e.message+'>>'; }
+          out.innerHTML += `<br>diag-result: status=${res.status} ok=${res.ok} time=${Math.round(t1-t0)}ms body=${body.slice(0,1000)}`;
+        } catch (e) {
+          out.innerHTML += `<br>diag-error: ${e.message}`;
+          console.error('Diag send error', e);
+        }
+        updateDebug();
+      });
+
+      // Diagnostic: test POST to httpbin.org to check generic CORS/network
+      const dbgHttpbin = document.getElementById('debug-httpbin');
+      dbgHttpbin.addEventListener('click', async () => {
+        const out = document.getElementById('debug-body');
+        out.innerHTML += `<br>httpbin: attempting POST https://httpbin.org/post`;
+        try {
+          const t0 = performance.now();
+          const res = await fetch('https://httpbin.org/post', { method: 'POST', mode: 'cors', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({test:'hello'}) });
+          const t1 = performance.now();
+          const body = await res.text();
+          out.innerHTML += `<br>httpbin-result: status=${res.status} time=${Math.round(t1-t0)}ms body=${body.slice(0,800)}`;
+        } catch (e) {
+          out.innerHTML += `<br>httpbin-error: ${e.message}`;
+          console.error('httpbin error', e);
+        }
+        updateDebug();
+      });
+
+      // Diagnostic: ping backend root to check basic reachability
+      const dbgPingBtn = document.getElementById('debug-ping');
+      dbgPingBtn.addEventListener('click', async () => {
+        const out = document.getElementById('debug-body');
+        out.innerHTML += `<br>ping: attempting GET ${BACKEND_URL}`;
+        try {
+          const t0 = performance.now();
+          const res = await fetch(BACKEND_URL, { method: 'GET', mode: 'cors', credentials: 'include' });
+          const t1 = performance.now();
+          let body = '';
+          try { body = await res.text(); } catch (e) { body = `<<no body read: ${e.message}>>`; }
+          out.innerHTML += `<br>ping-result: status=${res.status} ok=${res.ok} time=${Math.round(t1-t0)}ms body=${body.slice(0,800)}`;
+        } catch (e) {
+          out.innerHTML += `<br>ping-error: ${e.message}`;
+          console.error('Ping error', e);
+        }
+        updateDebug();
+      });
       dbgClose.addEventListener('click', () => document.getElementById('debug-panel').style.display='none');
       setInterval(updateDebug, 2000);
     } catch (e) { console.warn('Debug init failed', e); }
