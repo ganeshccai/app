@@ -35,7 +35,6 @@
       font-size: 20px;
       position: relative;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
     #user-status {
       position: absolute;
       right: 14px;
@@ -43,8 +42,14 @@
       font-weight: bold;
     }
     #chat-container {
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: 4px;
       flex: 1;
       overflow-y: auto;
+      .message .timestamp:hover {
+        background: rgba(0,0,0,0.05);
+      }
       padding: 14px;
       display: flex;
       flex-direction: column;
@@ -598,8 +603,8 @@ async function loadMessages() {
       const img = document.createElement("img");
       img.src = m.url;
       img.style.maxWidth = "240px";
-      img.style.borderRadius = "12px";
-      img.style.display = "block";
+        // Handle timestamp click
+        timestamp.onclick = (e) => {
       img.style.marginBottom = "6px";
 
       const download = document.createElement("a");
@@ -619,9 +624,140 @@ async function loadMessages() {
     // Add timestamp
     const timestamp = document.createElement("div");
     timestamp.className = "timestamp";
+        // Close options when clicking elsewhere
+        document.addEventListener('click', (e) => {
+          if (!e.target.closest('.timestamp')) {
+            document.querySelectorAll('.options.show').forEach(opt => {
+              opt.classList.remove('show');
+            });
+          }
+        });
+
+        // 1. Edit button (for agent's messages)
+        if (m.sender === "agent") {
+          const editBtn = document.createElement("button");
+          editBtn.className = "option-btn";
+          editBtn.title = "Edit";
+          editBtn.textContent = "✏️";
+          editBtn.onclick = async (e) => {
+            e.stopPropagation();
+            const newText = prompt("Edit message:", m.text);
+            if (newText !== null && newText.trim() !== "" && newText !== m.text) {
+              try {
+                const response = await fetch(`${BACKEND_URL}/edit_message`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${sessionToken}`
+                  },
+                  body: JSON.stringify({
+                    chat_id: chatId,
+                    message_id: m.id,
+                    text: newText,
+                    user_id: "agent"
+                  })
+                });
+            
+                if (response.ok) {
+                  loadMessages();
+                } else {
+                  throw new Error(`Failed to edit message: ${response.status}`);
+                }
+              } catch (error) {
+                console.error("Error editing message:", error);
+                alert("Failed to edit message. Please try again.");
+              }
+            }
+            options.classList.remove('show');
+          };
+          options.appendChild(editBtn);
+        }
     const date = new Date(m.timestamp * 1000);
+        // 2. Delete button (for agent's messages)
+        if (m.sender === "agent") {
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "option-btn";
+          deleteBtn.title = "Delete";
+          deleteBtn.textContent = "🗑️";
+          deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (confirm("Delete this message?")) {
+              deleteMessage(m.id);
+              options.classList.remove('show');
+            }
+          };
+          options.appendChild(deleteBtn);
+        }
     timestamp.textContent = date.toLocaleString('en-US', {
+        // 3. Emoji React button
+        const reactBtn = document.createElement("button");
+        reactBtn.className = "option-btn";
+        reactBtn.title = "React";
+        reactBtn.textContent = "😊";
+        reactBtn.onclick = (e) => {
+          e.stopPropagation();
+          const picker = document.createElement("div");
+          picker.className = "emoji-picker";
+          picker.innerHTML = `
+            <div class="emoji-grid">
+              <button class="emoji-btn" data-emoji="😊">😊</button>
+              <button class="emoji-btn" data-emoji="😂">😂</button>
+              <button class="emoji-btn" data-emoji="🤣">🤣</button>
+              <button class="emoji-btn" data-emoji="🥰">🥰</button>
+              <button class="emoji-btn" data-emoji="❤️">❤️</button>
+              <button class="emoji-btn" data-emoji="👍">👍</button>
+              <button class="emoji-btn" data-emoji="👋">👋</button>
+              <button class="emoji-btn" data-emoji="🙏">🙏</button>
+            </div>
+          `;
+          picker.style.display = "block";
+          picker.style.position = "absolute";
+          picker.style.bottom = "100%";
+          picker.style.right = "0";
+          options.appendChild(picker);
+      
+          picker.querySelectorAll(".emoji-btn").forEach(btn => {
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              addReaction(m.id, btn.dataset.emoji);
+              picker.remove();
+              options.classList.remove('show');
+            };
+          });
+      
+          document.addEventListener("click", () => picker.remove(), { once: true });
+        };
+        options.appendChild(reactBtn);
       hour: 'numeric',
+        // 4. Reply button
+        const replyBtn = document.createElement("button");
+        replyBtn.className = "option-btn";
+        replyBtn.title = "Reply";
+        replyBtn.textContent = "↩️";
+        replyBtn.onclick = (e) => {
+          e.stopPropagation();
+          replyingTo = m.id;
+          msgInput.focus();
+      
+          const replyIndicator = document.createElement("div");
+          replyIndicator.id = "reply-indicator";
+          replyIndicator.style.padding = "8px";
+          replyIndicator.style.background = "#f0f0f0";
+          replyIndicator.style.marginBottom = "8px";
+          replyIndicator.textContent = `Replying to: ${m.text || "Image"}`;
+      
+          const cancelBtn = document.createElement("button");
+          cancelBtn.textContent = "❌";
+          cancelBtn.onclick = () => {
+            replyingTo = null;
+            replyIndicator.remove();
+          };
+      
+          replyIndicator.appendChild(cancelBtn);
+          document.getElementById("input-container").insertBefore(replyIndicator, msgInput);
+          options.classList.remove('show');
+        };
+        options.appendChild(replyBtn);
       minute: '2-digit',
       hour12: true,
       month: 'short',
