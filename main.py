@@ -5,7 +5,39 @@ import os
 import base64
 
 app = Flask(__name__)
-CORS(app)
+# Basic CORS setup; we also add explicit headers below to ensure preflight and
+# credentialed requests (Authorization header) are permitted from browsers.
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+
+
+@app.before_request
+def _handle_options_preflight():
+    # If the browser sends an OPTIONS preflight, reply immediately with the
+    # appropriate headers so the real request can proceed.
+    if request.method == 'OPTIONS':
+        from flask import make_response
+        resp = make_response(('', 204))
+        origin = request.headers.get('Origin', '*')
+        resp.headers['Access-Control-Allow-Origin'] = origin
+        resp.headers['Access-Control-Allow-Credentials'] = 'true'
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, X-DIAG'
+        resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        return resp
+
+
+@app.after_request
+def _add_cors_headers(response):
+    # Ensure CORS headers are present on every response. We reflect the
+    # Origin header when present which is compatible with credentialed requests.
+    origin = request.headers.get('Origin')
+    if origin:
+        response.headers['Access-Control-Allow-Origin'] = origin
+    else:
+        response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, X-DIAG'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    return response
 
 # In-memory stores
 messages = {}
