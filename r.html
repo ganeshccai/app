@@ -117,21 +117,28 @@
     border: 1px solid #ddd;
   }
   
-  .message .options {
-    position: absolute;
-    right: -40px;
-    top: 50%;
-    transform: translateY(-50%);
-    display: none;
-  }
-  
-  .message:hover .options {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  
-  .option-btn {
+.message {
+  cursor: pointer;
+}
+
+.message .options {
+  position: absolute;
+  right: -40px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 10;
+}
+
+.message .options.show {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+}  .option-btn {
     background: white;
     border: 1px solid #ddd;
     border-radius: 50%;
@@ -403,10 +410,13 @@
 <script>
 // --- *** START: localStorage TAB LOCK *** ---
 const LOCK_KEY = 'regal_chat_session_lock';
-const LOCK_TIMEOUT_MS = 5000; // 5 seconds
+const LOCK_TIMEOUT_MS = 10000; // 10 seconds
 const thisTabId = Date.now().toString() + Math.random();
 let isThisTabActive = false; // Flag to track if this tab holds the lock
 let sessionCheckInterval = null; // Holds the interval timer
+
+// Clear any existing lock on page load
+localStorage.removeItem(LOCK_KEY);
 
 // *** NEW: ADDED THIS FUNCTION ***
 /**
@@ -416,7 +426,7 @@ function forceClearLock(e) {
   if (e) e.preventDefault(); // Stop link from navigating
   console.warn('Forcing lock release...');
   localStorage.removeItem(LOCK_KEY);
-  window.location.reload();
+  setTimeout(() => window.location.reload(), 100); // Small delay to ensure lock is cleared
 }
 // *** END NEW FUNCTION ***
 
@@ -441,25 +451,36 @@ function showLoginScreen() {
 function checkSessionLock() {
   try {
     const lockData = JSON.parse(localStorage.getItem(LOCK_KEY));
+    const now = Date.now();
     
-    if (!lockData) {
-      // No lock exists. Show the login screen.
+    if (!lockData || !lockData.timestamp || !lockData.id) {
+      // No lock exists or invalid lock data
+      localStorage.removeItem(LOCK_KEY); // Ensure clean state
       showLoginScreen();
       return;
     }
 
-    const isStale = (Date.now() - lockData.timestamp) > LOCK_TIMEOUT_MS;
+    const isStale = (now - lockData.timestamp) > LOCK_TIMEOUT_MS;
     
     if (isStale) {
       // Lock is old or "stale". This tab can take it.
       console.warn('Found stale lock, clearing it.');
       localStorage.removeItem(LOCK_KEY);
       showLoginScreen();
-    } else {
-      // Lock is fresh and held by another tab.
-      console.log('Session is active elsewhere. Locking this tab.');
-      showLockScreen();
+      return;
     }
+
+    // Check if this is our own lock
+    if (lockData.id === thisTabId) {
+      isThisTabActive = true;
+      showLoginScreen();
+      return;
+    }
+
+    // Lock is fresh and held by another tab
+    console.log('Session is active elsewhere. Locking this tab.');
+    showLockScreen();
+    
   } catch (e) {
     // Error parsing, probably bad data. Clear it and login.
     console.error('Error checking session lock, clearing.', e);
@@ -596,25 +617,60 @@ async function checkPwd() {
 
 function startPolling() {
   // --- Heartbeat to keep the lock alive ---
-  if (sessionCheckInterval) clearInterval(sessionCheckInterval);
+  if (sessionCheckInterval) {
+    clearInterval(sessionCheckInterval);
+    sessionCheckInterval = null;
+  }
+  
+  // Initial heartbeat
+  if (isThisTabActive && isLoggedIn) {
+    try {
+      const sessionData = { 
+        id: thisTabId, 
+        timestamp: Date.now(),
+        lastHeartbeat: Date.now() 
+      };
+      localStorage.setItem(LOCK_KEY, JSON.stringify(sessionData));
+    } catch (e) {
+      console.error("Failed to write initial heartbeat", e);
+    }
+  }
   
   sessionCheckInterval = setInterval(() => {
-    if (isThisTabActive && isLoggedIn) {
-      // This tab is active, refresh its lock
-      try {
-        const sessionData = { id: thisTabId, timestamp: Date.now() };
+    if (!isThisTabActive || !isLoggedIn) {
+      clearInterval(sessionCheckInterval);
+      sessionCheckInterval = null;
+      return;
+    }
+
+    try {
+      // Read current lock data
+      const lockData = JSON.parse(localStorage.getItem(LOCK_KEY));
+      
+      // Only update if this is our lock
+      if (lockData && lockData.id === thisTabId) {
+        const sessionData = { 
+          id: thisTabId, 
+          timestamp: lockData.timestamp, // Keep original timestamp
+          lastHeartbeat: Date.now() 
+        };
         localStorage.setItem(LOCK_KEY, JSON.stringify(sessionData));
-      } catch (e) {
-        console.error("Failed to write heartbeat, stopping.", e);
-        // This can happen if storage is full
+      } else {
+        // We lost our lock somehow
+        console.warn("Lost lock ownership");
         isThisTabActive = false;
         isLoggedIn = false;
         clearInterval(sessionCheckInterval);
+        sessionCheckInterval = null;
         showLockScreen();
       }
-    } else {
-      // This tab is no longer active, stop the heartbeat
+    } catch (e) {
+      console.error("Failed to write heartbeat, stopping.", e);
+      isThisTabActive = false;
+      isLoggedIn = false;
       clearInterval(sessionCheckInterval);
+      sessionCheckInterval = null;
+      showLockScreen();
     }
   }, 2000); // Refresh lock every 2 seconds
   // --- End Heartbeat ---
@@ -839,7 +895,14 @@ async function loadMessages() {
     // Add timestamp
     const timestamp = document.createElement("div");
     timestamp.className = "timestamp";
-    timestamp.textContent = new Date(m.timestamp * 1000).toLocaleString();
+    const date = new Date(m.timestamp * 1000);
+    timestamp.textContent = date.toLocaleString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      month: 'short',
+      day: 'numeric'
+    });
     d.appendChild(timestamp);
 
     // Add reactions
@@ -854,14 +917,26 @@ async function loadMessages() {
     });
     d.appendChild(reactionsDiv);
 
-    // Add message options (reply, react, delete)
+    // Add message options (reply, react, delete, edit)
     const options = document.createElement("div");
     options.className = "options";
+
+    // Close any other open options first
+    d.onclick = (e) => {
+      e.stopPropagation();
+      // Hide all other options
+      document.querySelectorAll('.options.show').forEach(opt => {
+        if (opt !== options) opt.classList.remove('show');
+      });
+      options.classList.toggle('show');
+    };
 
     const replyBtn = document.createElement("button");
     replyBtn.className = "option-btn";
     replyBtn.textContent = "↩️";
-    replyBtn.onclick = () => {
+    replyBtn.title = "Reply";
+    replyBtn.onclick = (e) => {
+      e.stopPropagation();
       replyingTo = m.id;
       msgInput.focus();
       // Show reply indicator
@@ -879,12 +954,14 @@ async function loadMessages() {
       };
       replyIndicator.appendChild(cancelBtn);
       document.getElementById("input-container").insertBefore(replyIndicator, msgInput);
+      options.classList.remove('show');
     };
     options.appendChild(replyBtn);
 
     const reactBtn = document.createElement("button");
     reactBtn.className = "option-btn";
     reactBtn.textContent = "😊";
+    reactBtn.title = "React";
     reactBtn.onclick = (e) => {
       e.stopPropagation();
       const picker = document.getElementById("emoji-picker").cloneNode(true);
@@ -898,6 +975,7 @@ async function loadMessages() {
           e.stopPropagation();
           addReaction(m.id, btn.dataset.emoji);
           picker.remove();
+          options.classList.remove('show');
         };
       });
       document.addEventListener("click", () => picker.remove(), { once: true });
@@ -905,10 +983,75 @@ async function loadMessages() {
     options.appendChild(reactBtn);
 
     if (m.sender === "user") {
+      // Edit button for user's own messages
+      const editBtn = document.createElement("button");
+      editBtn.className = "option-btn";
+      editBtn.textContent = "✏️";
+      editBtn.title = "Edit";
+      editBtn.onclick = (e) => {
+        e.stopPropagation();
+        const textContent = d.querySelector('.message-text');
+        if (!textContent) return;
+        
+        const originalText = m.text || "";
+        const editInput = document.createElement("textarea");
+        editInput.value = originalText;
+        editInput.style.width = "100%";
+        editInput.style.marginBottom = "8px";
+        editInput.style.padding = "8px";
+        editInput.style.borderRadius = "8px";
+        
+        const saveBtn = document.createElement("button");
+        saveBtn.textContent = "Save";
+        saveBtn.onclick = async () => {
+          const newText = editInput.value.trim();
+          if (newText && newText !== originalText) {
+            try {
+              const response = await fetch(`${BACKEND_URL}/edit_message`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${sessionToken}`
+                },
+                body: JSON.stringify({
+                  chat_id: chatId,
+                  message_id: m.id,
+                  text: newText
+                })
+              });
+              
+              if (response.ok) {
+                textContent.textContent = newText;
+                m.text = newText;
+              }
+            } catch (error) {
+              console.error("Error editing message:", error);
+            }
+          }
+          textContent.style.display = "block";
+          editInput.remove();
+          saveBtn.remove();
+          options.classList.remove('show');
+        };
+        
+        textContent.style.display = "none";
+        textContent.parentNode.insertBefore(editInput, textContent);
+        textContent.parentNode.insertBefore(saveBtn, textContent);
+        editInput.focus();
+      };
+      options.appendChild(editBtn);
+
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "option-btn";
       deleteBtn.textContent = "🗑️";
-      deleteBtn.onclick = () => deleteMessage(m.id);
+      deleteBtn.title = "Delete";
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (confirm("Are you sure you want to delete this message?")) {
+          deleteMessage(m.id);
+          options.classList.remove('show');
+        }
+      };
       options.appendChild(deleteBtn);
     }
 
