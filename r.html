@@ -355,14 +355,28 @@ const state = {
   replyingTo: null,  // Track which message we're replying to
 };
 
-// Track whether user manually scrolled up; if true, avoid auto-scroll
-let userScrolledUp = false;
-
-// When user scrolls, determine if they're away from bottom
-chatContainer.addEventListener('scroll', () => {
-  const nearBottom = chatContainer.scrollTop + chatContainer.clientHeight >= chatContainer.scrollHeight - 60;
-  userScrolledUp = !nearBottom;
-});
+// Scroll behavior management
+const scrollManager = {
+  userScrolledUp: false,
+  
+  init() {
+    elements.chatContainer.addEventListener('scroll', () => {
+      const nearBottom = this.isNearBottom();
+      this.userScrolledUp = !nearBottom;
+    });
+  },
+  
+  isNearBottom() {
+    const container = elements.chatContainer;
+    return container.scrollTop + container.clientHeight >= container.scrollHeight - 60;
+  },
+  
+  scrollToBottomIfNeeded() {
+    if (!this.userScrolledUp) {
+      elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+    }
+  }
+};
 
 // Emoji picker toggle
 emojiBtn.addEventListener("click", (e) => {
