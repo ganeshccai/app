@@ -426,9 +426,9 @@ async function checkPwd() {
     const data = await res.json();
     
     if (data.success && data.session_token) {
-      sessionToken = data.session_token;
-      document.getElementById("login-overlay").style.display = "none";
-      isLoggedIn = true;
+      state.sessionToken = data.session_token;
+      if (elements.loginOverlay) elements.loginOverlay.style.display = "none";
+      state.isLoggedIn = true;
       startPolling();
       loadMessages();
     } else {
@@ -1051,39 +1051,41 @@ async function loadTyping() {
 }
 
 async function sendTyping(text) {
-  if (!isLoggedIn || !isThisTabActive) return;
+  if (!state.isLoggedIn) return;
   await fetch(`${BACKEND_URL}/live_typing`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
+      "Authorization": `Bearer ${state.sessionToken}`
     },
     body: JSON.stringify({ chat_id: chatId, sender: "user", text })
   });
 }
 
 async function checkStatus() {
-  if (!isLoggedIn || !isThisTabActive) return;
-  const res = await fetch(`${BACKEND_URL}/is_online/${chatId}?t=${Date.now()}`);
+  if (!state.isLoggedIn) return;
+  const res = await fetch(`${BACKEND_URL}/is_online/${chatId}?t=${Date.now()}`, {
+    headers: { 'Authorization': `Bearer ${state.sessionToken}` }
+  });
   const d = await res.json();
   const emoji = d.agent_online ? "🟢" : "🔴";
   const time = d.agent_online ? "" : ` ${d.agent_last_seen}`;
-  agentStatus.textContent = `${emoji}${time}`;
+  elements.agentStatus.textContent = `${emoji}${time}`;
 }
 
 async function clearChat() {
-  if (!isLoggedIn || !isThisTabActive) return;
+  if (!state.isLoggedIn) return;
   await fetch(`${BACKEND_URL}/clear_chat/${chatId}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
+      "Authorization": `Bearer ${state.sessionToken}`
     },
     body: JSON.stringify({ sender: "user" })
   });
   elements.chatContainer.innerHTML = "";
-  lastMessageCount = 0;
-  lastProcessedMessages = [];
+  state.lastMessageCount = 0;
+  state.lastProcessedMessages = [];
 }
 
 // Add / edit / delete / react helper functions
@@ -1167,9 +1169,9 @@ async function deleteMessage(messageId) {
 }
 
 async function editMessage(messageId, newText) {
-  if (!isLoggedIn || !isThisTabActive) return;
+  if (!state.isLoggedIn) return;
   try {
-    const r = await fetch(`${BACKEND_URL}/edit_message`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ chat_id: chatId, message_id: messageId, text: newText, user_id: 'user' }) });
+    const r = await fetch(`${BACKEND_URL}/edit_message`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.sessionToken}` }, body: JSON.stringify({ chat_id: chatId, message_id: messageId, text: newText, user_id: 'user' }) });
     if (!r.ok) throw new Error('edit failed');
     loadMessages();
   } catch (e) {
@@ -1179,22 +1181,22 @@ async function editMessage(messageId, newText) {
 }
 
 async function markOnline() {
-  if (!isLoggedIn || !isThisTabActive) return;
+  if (!state.isLoggedIn) return;
   await fetch(`${BACKEND_URL}/mark_online`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${sessionToken}`
+      "Authorization": `Bearer ${state.sessionToken}`
     },
     body: JSON.stringify({ chat_id: chatId, sender: "user" })
   });
 }
 
-uploadBtn.addEventListener("click", () => fileInput.click());
+elements.uploadBtn.addEventListener("click", () => elements.fileInput.click());
 
-fileInput.addEventListener("change", async () => {
-  const file = fileInput.files[0];
-  if (!file || !isLoggedIn || !sessionToken || !isThisTabActive) return;
+elements.fileInput.addEventListener("change", async () => {
+  const file = elements.fileInput.files[0];
+  if (!file || !state.isLoggedIn || !state.sessionToken) return;
 
   const reader = new FileReader();
   reader.onload = async () => {
@@ -1203,7 +1205,7 @@ fileInput.addEventListener("change", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${sessionToken}`
+        "Authorization": `Bearer ${state.sessionToken}`
       },
       body: JSON.stringify({
         chat_id: chatId,
