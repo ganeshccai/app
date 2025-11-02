@@ -1,1069 +1,194 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
-  <title>R</title>
-  <style>
-    :root {
-      --accent: #feda75;
-      --accent2: #d62976;
-      --bg: linear-gradient(135deg, #feda75, #fa7e1e, #d62976, #962fbf, #4f5bd5);
-      --bubble-user: #ffcce0;
-      --bubble-agent: #ffffff;
-      --agent-border: #e0e0e0;
-    }
-    
-    html, body {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-    }
-    
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      display: flex;
-      flex-direction: column;
-      background: var(--bg);
-      background-size: cover;
-      background-repeat: no-repeat;
-      color: #333;
-    }
-    
-    header {
-      background: linear-gradient(90deg, var(--accent), var(--accent2));
-      color: white;
-      padding: 14px;
-      text-align: center;
-      font-weight: bold;
-      font-size: 20px;
-      position: relative;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    #agent-status {
-      position: absolute;
-      right: 14px;
-      top: 14px;
-      font-weight: bold;
-    }
-        cursor: pointer;
-        cursor: pointer;
-        padding: 2px 4px;
-        border-radius: 4px;
-        padding: 2px 4px;
-        border-radius: 4px;
-      .message .timestamp:hover {
-        background: rgba(0,0,0,0.05);
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+    <title>Chat</title>
+    <style>
+      :root{
+        --bg: #f6f7f9;
+        --user-bubble: #dff6f0;
+        --agent-bubble: #ffffff;
+        --muted: #666;
       }
-    
-    #chat-container {
-      .message .timestamp:hover {
-        background: rgba(0,0,0,0.05);
-      }
-      flex: 1;
-      overflow-y: auto;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      background-color: #f8f8f8;
-      position: relative;
-    }
-    
-    .message {
-      margin: 4px 0;
-      padding: 10px 14px;
-      border-radius: 14px;
-      max-width: 80%;
-      word-wrap: break-word;
-      font-size: 15px;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
-      position: relative;
-    }
-    
-    .message .timestamp {
-      font-size: 11px;
-      color: #777;
-      margin-top: 4px;
-      display: block;
-        cursor: pointer;
-        padding: 2px 4px;
-        border-radius: 4px;
-    }
-      .message .timestamp:hover {
-        background: rgba(0,0,0,0.05);
-      }
-    .message .reactions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-        cursor: pointer;
-        padding: 2px 4px;
-        border-radius: 4px;
-      margin-top: 4px;
-    }
-      .message .timestamp:hover {
-        background: rgba(0,0,0,0.05);
-    
-    .reaction {
-      background: rgba(255,255,255,0.9);
-      padding: 2px 6px;
-      border-radius: 12px;
-      font-size: 12px;
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      cursor: pointer;
-      border: 1px solid #ddd;
-    }
-    
-    .message .options {
-          
-          // Handle timestamp click
-          timestamp.onclick = (e) => {
-            e.stopPropagation();
-            const allOptions = document.querySelectorAll('.options.show');
-            const thisOptionsShown = options.classList.contains('show');
-            
-            // First hide all other open options
-            allOptions.forEach(opt => {
-              if (opt !== options) {
-                opt.classList.remove('show');
-              }
-            });
-            
-            // Then toggle this message's options
-            if (!thisOptionsShown) {
-              options.classList.add('show');
-            } else {
-              options.classList.remove('show');
-            }
-          };
-      position: absolute;
-      right: -40px;
-      top: 50%;
-      transform: translateY(-50%);
-      display: none;  /* Hidden by default */
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      z-index: 10;
-      opacity: 0;
-      transition: opacity 0.2s ease-in-out;
-    }
-    
-    .message .options.show {
-      justify-content: center;
-          // Edit button (only for own messages)
-          if (m.sender === "user") {
-            const editBtn = document.createElement("button");
-            editBtn.className = "option-btn";
-            editBtn.title = "Edit";
-            editBtn.textContent = "✏️";
-            editBtn.onclick = (e) => {
-              e.stopPropagation();
-              // TODO: Add edit functionality when backend supports it
-              alert("Edit functionality coming soon!");
-              options.classList.remove('show');
-            };
-            options.appendChild(editBtn);
-          }
-      cursor: pointer;
-          // Delete button (only for own messages)
-          if (m.sender === "user") {
-            const deleteBtn = document.createElement("button");
-            deleteBtn.className = "option-btn";
-            deleteBtn.title = "Delete";
-            deleteBtn.textContent = "🗑️";
-            deleteBtn.onclick = (e) => {
-              e.stopPropagation();
-              if (confirm("Delete this message?")) {
-                deleteMessage(m.id);
-                options.classList.remove('show');
-              }
-            };
-            options.appendChild(deleteBtn);
-          }
-      font-size: 14px;
-          // React button
-          const reactBtn = document.createElement("button");
-          reactBtn.className = "option-btn";
-          reactBtn.title = "React";
-          reactBtn.textContent = "😊";
-          reactBtn.onclick = (e) => {
-            e.stopPropagation();
-            const picker = document.getElementById("emoji-picker").cloneNode(true);
-            picker.style.display = "block";
-            picker.style.position = "absolute";
-            picker.style.bottom = "100%";
-            picker.style.right = "0";
-            options.appendChild(picker);
-            
-            picker.querySelectorAll(".emoji-btn").forEach(btn => {
-              btn.onclick = (e) => {
-                e.stopPropagation();
-                addReaction(m.id, btn.dataset.emoji);
-                picker.remove();
-                options.classList.remove('show');
-              };
-            });
-            
-            document.addEventListener("click", () => picker.remove(), { once: true });
-          };
-          options.appendChild(reactBtn);
-      padding: 0;
-          // Reply button
-          const replyBtn = document.createElement("button");
-          replyBtn.className = "option-btn";
-          replyBtn.title = "Reply";
-          replyBtn.textContent = "↩️";
-          replyBtn.onclick = (e) => {
-            e.stopPropagation();
-            replyingTo = m.id;
-            msgInput.focus();
-            msgDiv.appendChild(timestamp);
-            
-            const replyIndicator = document.createElement("div");
-            replyIndicator.id = "reply-indicator";
-            replyIndicator.style.padding = "8px";
-            // Handle timestamp click
-            timestamp.onclick = (e) => {
-            replyIndicator.appendChild(cancelBtn);
-            document.getElementById("input-container").insertBefore(replyIndicator, msgInput);
-            options.classList.remove('show');
-          };
-          options.appendChild(replyBtn);
-    }
-      background: rgba(255,255,255,0.9);
-      font-size: 16px;
-      right: 0;
-      bottom: 0;
-      background: rgba(255,255,255,0.95);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 999;
-    }
-    
-    #login-box {
-      background: #fff;
-            // Close options when clicking elsewhere
-            document.addEventListener('click', (e) => {
-              if (!e.target.closest('.timestamp')) {
-                document.querySelectorAll('.options.show').forEach(opt => {
-                  opt.classList.remove('show');
-                });
-              }
-            });
-
-            // 1. Edit button (for own messages)
-            if (m.sender === "user") {
-              const editBtn = document.createElement("button");
-              editBtn.className = "option-btn";
-              editBtn.title = "Edit";
-              editBtn.textContent = "✏️";
-              editBtn.onclick = async (e) => {
-                e.stopPropagation();
-                const newText = prompt("Edit message:", m.text);
-                if (newText !== null && newText.trim() !== "" && newText !== m.text) {
-                  try {
-                    const response = await fetch(`${BACKEND_URL}/edit_message`, {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${sessionToken}`
-                      },
-                      body: JSON.stringify({
-                        chat_id: chatId,
-                        message_id: m.id,
-                        text: newText,
-                        user_id: "user"
-                      })
-                    });
-                  
-                    if (response.ok) {
-                      loadMessages();
-                    } else {
-                      throw new Error(`Failed to edit message: ${response.status}`);
-                    }
-                  } catch (error) {
-                    console.error("Error editing message:", error);
-                    alert("Failed to edit message. Please try again.");
-                  }
-                }
-                options.classList.remove('show');
-              };
-              options.appendChild(editBtn);
-            }
-      padding: 24px;
-            // 2. Delete button (for own messages)
-            if (m.sender === "user") {
-              const deleteBtn = document.createElement("button");
-              deleteBtn.className = "option-btn";
-              deleteBtn.title = "Delete";
-              deleteBtn.textContent = "🗑️";
-              deleteBtn.onclick = (e) => {
-                e.stopPropagation();
-                if (confirm("Delete this message?")) {
-                  deleteMessage(m.id);
-                  options.classList.remove('show');
-                }
-              };
-              options.appendChild(deleteBtn);
-            }
-      border-radius: 12px;
-            // 3. React button
-            const reactBtn = document.createElement("button");
-            reactBtn.className = "option-btn";
-            reactBtn.title = "React";
-            reactBtn.textContent = "😊";
-            reactBtn.onclick = (e) => {
-              e.stopPropagation();
-              const picker = document.getElementById("emoji-picker").cloneNode(true);
-              picker.style.display = "block";
-              picker.style.position = "absolute";
-              picker.style.bottom = "100%";
-              picker.style.right = "0";
-              options.appendChild(picker);
-            
-              picker.querySelectorAll(".emoji-btn").forEach(btn => {
-                btn.onclick = (e) => {
-                  e.stopPropagation();
-                  addReaction(m.id, btn.dataset.emoji);
-                  picker.remove();
-                  options.classList.remove('show');
-                };
-              });
-            
-              document.addEventListener("click", () => picker.remove(), { once: true });
-            };
-            options.appendChild(reactBtn);
-      box-shadow: 0 0 12px rgba(0,0,0,0.15);
-            // 4. Reply button
-            const replyBtn = document.createElement("button");
-            replyBtn.className = "option-btn";
-            replyBtn.title = "Reply";
-            replyBtn.textContent = "↩️";
-            replyBtn.onclick = (e) => {
-              e.stopPropagation();
-              replyingTo = m.id;
-              msgInput.focus();
-            
-              const replyIndicator = document.createElement("div");
-              replyIndicator.id = "reply-indicator";
-              replyIndicator.style.padding = "8px";
-              replyIndicator.style.background = "#f0f0f0";
-              replyIndicator.style.marginBottom = "8px";
-              replyIndicator.textContent = `Replying to: ${m.text || "Image"}`;
-            
-              const cancelBtn = document.createElement("button");
-              cancelBtn.textContent = "❌";
-              cancelBtn.onclick = () => {
-                replyingTo = null;
-                replyIndicator.remove();
-              };
-            
-              replyIndicator.appendChild(cancelBtn);
-              document.getElementById("input-container").insertBefore(replyIndicator, msgInput);
-              options.classList.remove('show');
-            };
-            options.appendChild(replyBtn);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      width: 280px;
-    }
-    
-    #login-box input {
-      padding: 10px;
-      font-size: 16px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      outline: none;
-    }
-    
-    .extra-buttons {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    
-    #emoji-picker {
-      position: absolute;
-      bottom: 100%;
-      right: 0;
-      background: white;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 8px;
-      display: none;
-    }
-    
-    #emoji-picker.show {
-      display: block;
-    }
-    
-    .emoji-grid {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 4px;
-    }
-    
-    .emoji-btn {
-      background: none;
-      border: none;
-      font-size: 20px;
-      padding: 4px;
-      cursor: pointer;
-      border-radius: 4px;
-    }
-    
-    .emoji-btn:hover {
-      background: #f0f0f0;
-    }
-    
-    .upload-progress {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      padding: 20px;
-      border-radius: 10px;
-      z-index: 1000;
-    }
-
-    @keyframes gnReshmaFade {
-      0% {
-        opacity: 0;
-        transform: translateX(-50%) scale(0.5);
-      }
-      50% {
-        opacity: 1;
-        transform: translateX(-50%) scale(1);
-      }
-      100% {
-        opacity: 0;
-        transform: translateX(-50%) scale(0.5);
-      }
-    }
-
-    .bubble {
-      position: fixed;
-      bottom: 80px;
-      font-size: 60px;
-      animation: floatUpSlow 3s linear forwards;
-      pointer-events: none;
-      z-index: 100;
-    }
-
-    @keyframes floatUpSlow {
-      0% {
-        transform: translateY(0) translateX(-50%);
-        opacity: 1;
-      }
-      90% {
-        opacity: 1;
-      }
-      100% {
-        transform: translateY(calc(-50vh + 40px)) translateX(-50%);
-        opacity: 0;
-      }
-    }
-  </style>
-</head>
-<body data-chat-id="1234">
-  <div id="login-overlay">
-    <div id="login-box">
-      <input type="password" id="pwd" placeholder="Enter password" />
-      <button onclick="checkPwd()">Login 🔓</button>
-      <div id="login-msg" style="color:red;"></div>
-    </div>
-  </div>
-
-  <header>𝓡𝓮𝓰𝓪𝓵 <span id="agent-status">🔴</span></header>
-  <div id="chat-container"></div>
-  
-  <div id="input-container">
-    <textarea id="msg" placeholder="Type message..." rows="1"></textarea>
-    <div class="extra-buttons">
-      <button id="emoji-btn">😊</button>
-      <button id="upload-btn">🖼️</button>
-      <button id="clear-btn">❌</button>
-    </div>
-    <button id="send-btn">➤</button>
-    
-    <div id="emoji-picker">
-      <div class="emoji-grid">
-        <button class="emoji-btn" data-emoji="😊">😊</button>
-        <button class="emoji-btn" data-emoji="😂">😂</button>
-        <button class="emoji-btn" data-emoji="🤣">🤣</button>
-        <button class="emoji-btn" data-emoji="😍">😍</button>
-        <button class="emoji-btn" data-emoji="🥰">🥰</button>
-        <button class="emoji-btn" data-emoji="😘">😘</button>
-        <button class="emoji-btn" data-emoji="❤️">❤️</button>
-        <button class="emoji-btn" data-emoji="💕">💕</button>
-        <button class="emoji-btn" data-emoji="💖">💖</button>
-        <button class="emoji-btn" data-emoji="👍">👍</button>
-        <button class="emoji-btn" data-emoji="🙏">🙏</button>
-        <button class="emoji-btn" data-emoji="🎉">🎉</button>
+      html,body{height:100%;margin:0;padding:0;font-family:Segoe UI, system-ui, -apple-system, sans-serif;background:var(--bg)}
+      header{background:#ffffff;padding:12px 16px;box-shadow:0 1px 2px rgba(0,0,0,0.06);font-weight:600}
+      #chat-container{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px;height:calc(100vh - 160px)}
+      .message{max-width:78%;padding:10px 12px;border-radius:12px;position:relative;box-shadow:0 1px 2px rgba(0,0,0,0.03)}
+      .user-msg{align-self:flex-end;background:var(--user-bubble)}
+      .agent-msg{align-self:flex-start;background:var(--agent-bubble)}
+      .timestamp{font-size:11px;color:var(--muted);margin-top:6px;display:inline-block;padding:2px 6px;border-radius:6px}
+      .timestamp{cursor:pointer}
+      .options{position:absolute;right:-8px;top:50%;transform:translateY(-50%);display:none;flex-direction:column;background:#fff;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.12);padding:6px;gap:6px;z-index:30}
+      .options.show{display:flex}
+      .option-btn{background:none;border:none;padding:8px;border-radius:6px;cursor:pointer;font-size:16px}
+      .reactions{display:flex;gap:6px;margin-top:6px}
+      .reaction{background:#fff;border:1px solid #eee;padding:4px 8px;border-radius:12px;font-size:13px;cursor:pointer}
+      #input-container{display:flex;gap:8px;padding:12px;background:#fff;align-items:flex-end}
+      #msg{flex:1;padding:8px 10px;border-radius:8px;border:1px solid #eee;min-height:36px;resize:none}
+      #emoji-picker{position:absolute;bottom:64px;right:16px;background:#fff;border:1px solid #eee;padding:8px;border-radius:8px;display:none}
+      #emoji-picker.show{display:block}
+      .emoji-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+      .emoji-btn{background:none;border:none;font-size:18px;cursor:pointer}
+      .upload-progress{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.75);color:#fff;padding:12px;border-radius:8px}
+      #login-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center}
+      #login-box{background:#fff;padding:20px;border-radius:8px;display:flex;flex-direction:column;gap:8px;min-width:280px}
+      #reply-indicator{padding:8px;background:#f0f0f0;border-radius:8px;margin-bottom:8px}
+    </style>
+  </head>
+  <body data-chat-id="1234">
+    <div id="login-overlay">
+      <div id="login-box">
+        <input id="pwd" type="password" placeholder="Enter password" />
+        <button id="login-btn">Login</button>
+        <div id="login-msg" style="color:red"></div>
       </div>
     </div>
-    
-    <input type="file" id="file-input" accept="image/*" style="display: none;">
-  </div>
 
-  <script>
-    const BACKEND_URL = "https://app-788207962975.us-central1.run.app";
-    const chatId = document.body.dataset.chatId || "1234";
-    let isLoggedIn = false;
-    let sessionToken = null;
-    let replyingTo = null;
+    <header>Chat <span id="agent-status">🔴</span></header>
+    <div id="chat-container"></div>
 
-    // DOM Elements
-    const msgInput = document.getElementById("msg");
-    const sendBtn = document.getElementById("send-btn");
-    const clearBtn = document.getElementById("clear-btn");
-    const chatContainer = document.getElementById("chat-container");
-    const agentStatus = document.getElementById("agent-status");
-    const emojiBtn = document.getElementById("emoji-btn");
-    const emojiPicker = document.getElementById("emoji-picker");
-    const uploadBtn = document.getElementById("upload-btn");
-    const fileInput = document.getElementById("file-input");
+    <div id="input-container">
+      <textarea id="msg" rows="1" placeholder="Type a message..."></textarea>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <button id="emoji-btn">😊</button>
+        <button id="upload-btn">🖼️</button>
+        <button id="clear-btn">❌</button>
+      </div>
+      <button id="send-btn">➤</button>
+      <div id="emoji-picker">
+        <div class="emoji-grid">
+          <button class="emoji-btn" data-emoji="😊">😊</button>
+          <button class="emoji-btn" data-emoji="😂">😂</button>
+          <button class="emoji-btn" data-emoji="😍">😍</button>
+          <button class="emoji-btn" data-emoji="👍">👍</button>
+          <button class="emoji-btn" data-emoji="🎉">🎉</button>
+          <button class="emoji-btn" data-emoji="❤️">❤️</button>
+        </div>
+      </div>
+      <input id="file-input" type="file" accept="image/*" style="display:none" />
+    </div>
 
-    async function checkPwd() {
-      try {
-        const pwd = document.getElementById("pwd").value;
-        if (!pwd) {
-          document.getElementById("login-msg").textContent = "Please enter password";
-          return;
-        }
+    <script>
+      const BACKEND_URL = "https://app-788207962975.us-central1.run.app";
+      const chatId = document.body.dataset.chatId || "1234";
+      let isLoggedIn = false;
+      let sessionToken = null;
+      let replyingTo = null;
 
-        const res = await fetch(`${BACKEND_URL}/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: chatId, password: pwd, sender: "user" })
-        });
+      const msgInput = document.getElementById('msg');
+      const sendBtn = document.getElementById('send-btn');
+      const clearBtn = document.getElementById('clear-btn');
+      const chatContainer = document.getElementById('chat-container');
+      const agentStatus = document.getElementById('agent-status');
+      const emojiBtn = document.getElementById('emoji-btn');
+      const emojiPicker = document.getElementById('emoji-picker');
+      const uploadBtn = document.getElementById('upload-btn');
+      const fileInput = document.getElementById('file-input');
 
-        const data = await res.json();
-        if (data.success) {
-          sessionToken = data.session_token;
-          isLoggedIn = true;
-          document.getElementById("login-overlay").style.display = "none";
-          startPolling();
-        } else {
-          document.getElementById("login-msg").textContent = data.error || "Login failed";
-        }
-      } catch (error) {
-        console.error("Login error:", error);
-        document.getElementById("login-msg").textContent = "Error connecting to server";
+      document.getElementById('login-btn').addEventListener('click', checkPwd);
+
+      async function checkPwd(){
+        const pwd = document.getElementById('pwd').value;
+        if(!pwd){document.getElementById('login-msg').textContent='Enter password';return}
+        try{
+          const res = await fetch(`${BACKEND_URL}/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chatId,password:pwd,sender:'user'})});
+          const data = await res.json();
+          if(data.success){sessionToken = data.session_token; isLoggedIn = true; document.getElementById('login-overlay').style.display='none'; startPolling()} else {document.getElementById('login-msg').textContent = data.error||'Login failed'}
+        }catch(e){console.error(e);document.getElementById('login-msg').textContent='Connection error'}
       }
-    }
 
-    function startPolling() {
-      loadMessages();
-      checkStatus();
-      markOnline();
-      
-      setInterval(() => {
-        if (isLoggedIn) {
-          loadMessages();
-          checkStatus();
-        }
-      }, 1000);
+      function startPolling(){loadMessages(); checkStatus(); markOnline(); setInterval(()=>{ if(isLoggedIn) loadMessages(); },1000); setInterval(()=>{ if(isLoggedIn) markOnline(); },2000)}
 
-      setInterval(() => {
-        if (isLoggedIn && document.visibilityState === "visible") {
-          markOnline();
-        }
-      }, 2000);
-    }
-
-    async function sendMessage() {
-      const text = msgInput.value.trim();
-      if (!text || !isLoggedIn || !sessionToken) return;
-
-      try {
-        const messageData = {
-          chat_id: chatId,
-          sender: "user",
-          text
-        };
-
-        if (replyingTo) {
-          messageData.reply_to = replyingTo;
-          replyingTo = null;
-          const indicator = document.getElementById("reply-indicator");
-          if (indicator) indicator.remove();
-        }
-
-        const response = await fetch(`${BACKEND_URL}/send`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${sessionToken}`
-          },
-          body: JSON.stringify(messageData)
-        });
-
-        if (!response.ok) {
-          if (response.status === 403) {
-            isLoggedIn = false;
-            sessionToken = null;
-            document.getElementById("login-overlay").style.display = "flex";
-            return;
-          }
-          throw new Error(`Failed to send message: ${response.status}`);
-        }
-
-        msgInput.value = "";
-        loadMessages();
-      } catch (error) {
-        console.error("Error sending message:", error);
-        alert("Failed to send message. Please try again.");
+      async function sendMessage(){
+        const text = msgInput.value.trim();
+        if(!text || !isLoggedIn || !sessionToken) return;
+        try{
+          const body = { chat_id: chatId, sender: 'user', text };
+          if(replyingTo){ body.reply_to = replyingTo; replyingTo = null; const ind = document.getElementById('reply-indicator'); if(ind) ind.remove(); }
+          const r = await fetch(`${BACKEND_URL}/send`,{ method:'POST', headers: {'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body: JSON.stringify(body) });
+          if(!r.ok){ if(r.status===403){ isLoggedIn=false; sessionToken=null; document.getElementById('login-overlay').style.display='flex'; return } throw new Error('send failed') }
+          msgInput.value=''; loadMessages();
+        }catch(e){ console.error(e); alert('Failed to send message') }
       }
-    }
 
-    async function loadMessages() {
-      if (!isLoggedIn || !sessionToken) return;
+      async function loadMessages(){
+        if(!isLoggedIn || !sessionToken) return;
+        try{
+          const isTabActive = document.visibilityState === 'visible';
+          const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=user&active=${isTabActive}`,{ headers: {'Authorization':`Bearer ${sessionToken}`} });
+          if(!res.ok){ if(res.status===403){ isLoggedIn=false; sessionToken=null; document.getElementById('login-overlay').style.display='flex'; return } throw new Error('load failed') }
+          const messages = await res.json();
+          chatContainer.innerHTML = '';
+          messages.forEach(m => {
+            const msgDiv = document.createElement('div'); msgDiv.className = `message ${m.sender==='user'?'user-msg':'agent-msg'}`;
 
-      try {
-        const isTabActive = document.visibilityState === "visible";
-        const res = await fetch(
-          `${BACKEND_URL}/messages/${chatId}?viewer=user&active=${isTabActive}`,
-          {
-            headers: {
-              "Authorization": `Bearer ${sessionToken}`
+            if(m.reply_to){ const replyMsg = messages.find(x=>x.id===m.reply_to); if(replyMsg){ const r = document.createElement('div'); r.className='reply-to'; r.textContent = replyMsg.text || 'Image'; r.style.fontSize='13px'; r.style.opacity='0.9'; r.style.marginBottom='6px'; msgDiv.appendChild(r) } }
+
+            if(m.type==='image'){ const img = document.createElement('img'); img.src = m.url; img.style.maxWidth='200px'; img.style.borderRadius='8px'; msgDiv.appendChild(img) } else { const textDiv = document.createElement('div'); textDiv.className='message-text'; textDiv.textContent = m.text; msgDiv.appendChild(textDiv) }
+
+            const timestamp = document.createElement('div'); timestamp.className='timestamp'; timestamp.textContent = new Date(m.timestamp*1000).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+
+            const options = document.createElement('div'); options.className='options';
+
+            // Timestamp click toggles the options menu (only timestamp opens)
+            timestamp.addEventListener('click', (e) => { e.stopPropagation(); document.querySelectorAll('.options.show').forEach(o=>{ if(o!==options) o.classList.remove('show') }); options.classList.toggle('show'); });
+
+            // Close open options when clicking anywhere else
+            document.addEventListener('click', (e)=>{ if(!e.target.closest('.timestamp')) document.querySelectorAll('.options.show').forEach(o=>o.classList.remove('show')) });
+
+            // Option buttons order: Edit, Delete, Emoji, Reply
+            if(m.sender==='user'){
+              const editBtn = document.createElement('button'); editBtn.className='option-btn'; editBtn.title='Edit'; editBtn.textContent='✏️';
+              editBtn.addEventListener('click', async (ev)=>{ ev.stopPropagation(); const newText = prompt('Edit message:', m.text); if(newText!==null && newText.trim()!=='' && newText !== m.text){ try{ const r = await fetch(`${BACKEND_URL}/edit_message`,{ method:'POST', headers:{ 'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}` }, body: JSON.stringify({ chat_id: chatId, message_id: m.id, text: newText, user_id: 'user' }) }); if(r.ok) loadMessages(); else throw new Error('edit failed') }catch(err){ console.error(err); alert('Edit failed') } } options.classList.remove('show'); });
+              options.appendChild(editBtn);
+
+              const delBtn = document.createElement('button'); delBtn.className='option-btn'; delBtn.title='Delete'; delBtn.textContent='🗑️';
+              delBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); if(confirm('Delete this message?')){ deleteMessage(m.id); options.classList.remove('show') } });
+              options.appendChild(delBtn);
             }
-          }
-        );
 
-        if (!res.ok) {
-          if (res.status === 403) {
-            isLoggedIn = false;
-            sessionToken = null;
-            document.getElementById("login-overlay").style.display = "flex";
-            return;
-          }
-          throw new Error(`Failed to load messages: ${res.status}`);
-        }
+            const emojiBtnQuick = document.createElement('button'); emojiBtnQuick.className='option-btn'; emojiBtnQuick.title='Emoji'; emojiBtnQuick.textContent='😊';
+            emojiBtnQuick.addEventListener('click',(ev)=>{ ev.stopPropagation(); const picker = emojiPicker.cloneNode(true); picker.id=''; picker.style.display='block'; picker.style.position='absolute'; picker.style.bottom='100%'; picker.style.right='0'; options.appendChild(picker); picker.querySelectorAll('.emoji-btn').forEach(b=>{ b.addEventListener('click',(e)=>{ e.stopPropagation(); addReaction(m.id, b.dataset.emoji); picker.remove(); options.classList.remove('show'); }) }); document.addEventListener('click', ()=>{ if(picker && picker.remove) picker.remove() }, { once:true }) });
+            options.appendChild(emojiBtnQuick);
 
-        const messages = await res.json();
-        chatContainer.innerHTML = "";
+            const replyBtn = document.createElement('button'); replyBtn.className='option-btn'; replyBtn.title='Reply'; replyBtn.textContent='↩️';
+            replyBtn.addEventListener('click',(ev)=>{ ev.stopPropagation(); replyingTo = m.id; msgInput.focus(); const existing = document.getElementById('reply-indicator'); if(existing) existing.remove(); const replyIndicator = document.createElement('div'); replyIndicator.id='reply-indicator'; replyIndicator.textContent = `Replying to: ${m.text || 'Image'}`; const cancelBtn = document.createElement('button'); cancelBtn.textContent='❌'; cancelBtn.style.marginLeft='8px'; cancelBtn.addEventListener('click', ()=>{ replyingTo = null; replyIndicator.remove() }); replyIndicator.appendChild(cancelBtn); document.getElementById('input-container').insertBefore(replyIndicator, msgInput); options.classList.remove('show'); });
+            options.appendChild(replyBtn);
 
-        messages.forEach(m => {
-          const msgDiv = document.createElement("div");
-          msgDiv.className = `message ${m.sender === "user" ? "user-msg" : "agent-msg"}`;
-          
-          if (m.reply_to) {
-            const replyMsg = messages.find(msg => msg.id === m.reply_to);
-            if (replyMsg) {
-              const replyDiv = document.createElement("div");
-              replyDiv.className = "reply-to";
-              replyDiv.textContent = replyMsg.text || "Image";
-              msgDiv.appendChild(replyDiv);
-            }
-          }
+            msgDiv.appendChild(timestamp);
+            msgDiv.appendChild(options);
 
-          if (m.type === "image") {
-            const img = document.createElement("img");
-            img.src = m.url;
-            img.style.maxWidth = "200px";
-            img.style.borderRadius = "8px";
-            msgDiv.appendChild(img);
-          } else {
-            const textDiv = document.createElement("div");
-            textDiv.className = "message-text";
-            textDiv.textContent = m.text;
-            msgDiv.appendChild(textDiv);
-          }
+            if(m.reactions && Object.keys(m.reactions).length>0){ const reactionsDiv = document.createElement('div'); reactionsDiv.className='reactions'; Object.entries(m.reactions).forEach(([emoji,users])=>{ const reaction = document.createElement('div'); reaction.className='reaction'; reaction.textContent = `${emoji} ${users.length}`; reaction.addEventListener('click', ()=>addReaction(m.id, emoji)); reactionsDiv.appendChild(reaction) }); msgDiv.appendChild(reactionsDiv) }
 
-          const timestamp = document.createElement("div");
-          timestamp.className = "timestamp";
-          const date = new Date(m.timestamp * 1000);
-          timestamp.textContent = date.toLocaleString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
+            chatContainer.appendChild(msgDiv);
           });
-          msgDiv.appendChild(timestamp);
-
-          const options = document.createElement("div");
-          options.className = "options";
-
-          // Close all message options when clicking anywhere in the document
-          document.addEventListener('click', (e) => {
-            if (!e.target.closest('.message')) {
-              document.querySelectorAll('.options.show').forEach(opt => {
-                opt.classList.remove('show');
-              });
-            }
-          });
-
-          // Handle message click
-          msgDiv.onclick = (e) => {
-            e.stopPropagation();
-            const allOptions = document.querySelectorAll('.options.show');
-            const thisOptionsShown = options.classList.contains('show');
-            
-            // First hide all other open options
-            allOptions.forEach(opt => {
-              if (opt !== options) {
-                opt.classList.remove('show');
-              }
-            });
-            
-            // Then toggle this message's options
-            if (!thisOptionsShown) {
-              options.classList.add('show');
-            } else {
-              options.classList.remove('show');
-            }
-          };
-
-          // Reply button
-          const replyBtn = document.createElement("button");
-          replyBtn.className = "option-btn";
-          replyBtn.title = "Reply";
-          replyBtn.textContent = "↩️";
-          replyBtn.onclick = (e) => {
-            e.stopPropagation();
-            replyingTo = m.id;
-            msgInput.focus();
-            
-            const replyIndicator = document.createElement("div");
-            replyIndicator.id = "reply-indicator";
-            replyIndicator.style.padding = "8px";
-            replyIndicator.style.background = "#f0f0f0";
-            replyIndicator.style.marginBottom = "8px";
-            replyIndicator.textContent = `Replying to: ${m.text || "Image"}`;
-            
-            const cancelBtn = document.createElement("button");
-            cancelBtn.textContent = "❌";
-            cancelBtn.onclick = () => {
-              replyingTo = null;
-              replyIndicator.remove();
-            };
-            
-            replyIndicator.appendChild(cancelBtn);
-            document.getElementById("input-container").insertBefore(replyIndicator, msgInput);
-            options.classList.remove('show');
-          };
-          options.appendChild(replyBtn);
-
-          // React button
-          const reactBtn = document.createElement("button");
-          reactBtn.className = "option-btn";
-          reactBtn.title = "React";
-          reactBtn.textContent = "😊";
-          reactBtn.onclick = (e) => {
-            e.stopPropagation();
-            const picker = document.getElementById("emoji-picker").cloneNode(true);
-            picker.style.display = "block";
-            picker.style.position = "absolute";
-            picker.style.bottom = "100%";
-            picker.style.right = "0";
-            options.appendChild(picker);
-            
-            picker.querySelectorAll(".emoji-btn").forEach(btn => {
-              btn.onclick = (e) => {
-                e.stopPropagation();
-                addReaction(m.id, btn.dataset.emoji);
-                picker.remove();
-                options.classList.remove('show');
-              };
-            });
-            
-            document.addEventListener("click", () => picker.remove(), { once: true });
-          };
-          options.appendChild(reactBtn);
-
-          // Delete button (only for user's messages)
-          if (m.sender === "user") {
-            const deleteBtn = document.createElement("button");
-            deleteBtn.className = "option-btn";
-            deleteBtn.title = "Delete";
-            deleteBtn.textContent = "🗑️";
-            deleteBtn.onclick = (e) => {
-              e.stopPropagation();
-              if (confirm("Delete this message?")) {
-                deleteMessage(m.id);
-                options.classList.remove('show');
-              }
-            };
-            options.appendChild(deleteBtn);
-          }
-
-          msgDiv.appendChild(options);
-
-          // Add reactions
-          if (m.reactions && Object.keys(m.reactions).length > 0) {
-            const reactionsDiv = document.createElement("div");
-            reactionsDiv.className = "reactions";
-            Object.entries(m.reactions).forEach(([emoji, users]) => {
-              const reaction = document.createElement("div");
-              reaction.className = "reaction";
-              reaction.textContent = `${emoji} ${users.length}`;
-              reaction.onclick = () => addReaction(m.id, emoji);
-              reactionsDiv.appendChild(reaction);
-            });
-            msgDiv.appendChild(reactionsDiv);
-          }
-
-          chatContainer.appendChild(msgDiv);
-        });
-
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-      } catch (error) {
-        console.error("Error loading messages:", error);
-      }
-    }
-
-    async function addReaction(messageId, emoji) {
-      if (!isLoggedIn || !sessionToken) return;
-
-      try {
-        const response = await fetch(`${BACKEND_URL}/react`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${sessionToken}`
-          },
-          body: JSON.stringify({
-            chat_id: chatId,
-            message_id: messageId,
-            reaction: emoji,
-            user_id: "user"
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to add reaction: ${response.status}`);
-        }
-
-        loadMessages();
-      } catch (error) {
-        console.error("Error adding reaction:", error);
-        alert("Failed to add reaction. Please try again.");
-      }
-    }
-
-    async function deleteMessage(messageId) {
-      if (!isLoggedIn || !sessionToken) return;
-
-      try {
-        const response = await fetch(`${BACKEND_URL}/delete_message`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${sessionToken}`
-          },
-          body: JSON.stringify({
-            chat_id: chatId,
-            message_id: messageId,
-            user_id: "user"
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to delete message: ${response.status}`);
-        }
-
-        loadMessages();
-      } catch (error) {
-        console.error("Error deleting message:", error);
-        alert("Failed to delete message. Please try again.");
-      }
-    }
-
-    async function checkStatus() {
-      if (!isLoggedIn) return;
-
-      try {
-        const response = await fetch(`${BACKEND_URL}/is_online/${chatId}`);
-        const data = await response.json();
-        
-        const emoji = data.agent_online ? "🟢" : "🔴";
-        const time = data.agent_online ? "" : ` ${data.agent_last_seen}`;
-        agentStatus.textContent = `${emoji}${time}`;
-      } catch (error) {
-        console.error("Error checking status:", error);
-      }
-    }
-
-    async function markOnline() {
-      if (!isLoggedIn || !sessionToken) return;
-
-      try {
-        await fetch(`${BACKEND_URL}/mark_online`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${sessionToken}`
-          },
-          body: JSON.stringify({
-            chat_id: chatId,
-            sender: "user"
-          })
-        });
-      } catch (error) {
-        console.error("Error marking online:", error);
-      }
-    }
-
-    // File upload handling
-    uploadBtn.addEventListener("click", () => {
-      if (!isLoggedIn || !sessionToken) {
-        alert("Please log in first");
-        return;
-      }
-      fileInput.click();
-    });
-
-    fileInput.addEventListener("change", async () => {
-      const file = fileInput.files[0];
-      if (!file || !isLoggedIn || !sessionToken) return;
-
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        alert("File too large. Maximum size is 5MB.");
-        fileInput.value = "";
-        return;
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }catch(err){ console.error('load messages error', err) }
       }
 
-      // Validate file type
-      if (!file.type.startsWith("image/")) {
-        alert("Please select an image file.");
-        fileInput.value = "";
-        return;
-      }
+      async function addReaction(messageId, emoji){ if(!isLoggedIn || !sessionToken) return; try{ const r = await fetch(`${BACKEND_URL}/react`,{ method:'POST', headers:{ 'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}` }, body: JSON.stringify({ chat_id: chatId, message_id: messageId, reaction: emoji, user_id: 'user' }) }); if(!r.ok) throw new Error('react failed'); loadMessages(); }catch(e){ console.error(e) } }
 
-      try {
-        const progressDiv = document.createElement("div");
-        progressDiv.className = "upload-progress";
-        progressDiv.textContent = "Uploading image...";
-        document.body.appendChild(progressDiv);
+      async function deleteMessage(messageId){ if(!isLoggedIn || !sessionToken) return; try{ const r = await fetch(`${BACKEND_URL}/delete_message`,{ method:'POST', headers:{ 'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}` }, body: JSON.stringify({ chat_id: chatId, message_id: messageId, user_id: 'user' }) }); if(!r.ok) throw new Error('delete failed'); loadMessages(); }catch(e){ console.error(e); alert('Failed to delete message') } }
 
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("chat_id", chatId);
-        formData.append("sender", "user");
+      async function checkStatus(){ if(!isLoggedIn) return; try{ const r = await fetch(`${BACKEND_URL}/is_online/${chatId}`); const data = await r.json(); agentStatus.textContent = data.agent_online ? '🟢' : '🔴'; }catch(e){ console.error(e) } }
+      async function markOnline(){ if(!isLoggedIn || !sessionToken) return; try{ await fetch(`${BACKEND_URL}/mark_online`,{ method:'POST', headers:{ 'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}` }, body: JSON.stringify({ chat_id: chatId, sender: 'user' }) }) }catch(e){ console.error(e) } }
 
-        const uploadResponse = await fetch(`${BACKEND_URL}/upload`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${sessionToken}`
-          },
-          body: formData
-        });
+      uploadBtn.addEventListener('click', ()=>{ if(!isLoggedIn || !sessionToken){ alert('Please log in first'); return } fileInput.click() });
+      fileInput.addEventListener('change', async ()=>{ const file = fileInput.files[0]; if(!file) return; if(file.size > 5*1024*1024){ alert('File too large. Max 5MB'); fileInput.value = ''; return } if(!file.type.startsWith('image/')){ alert('Select an image'); fileInput.value=''; return } try{ const progress = document.createElement('div'); progress.className='upload-progress'; progress.textContent='Uploading...'; document.body.appendChild(progress); const fd = new FormData(); fd.append('file', file); fd.append('chat_id', chatId); fd.append('sender', 'user'); const up = await fetch(`${BACKEND_URL}/upload`,{ method:'POST', headers:{ 'Authorization':`Bearer ${sessionToken}` }, body: fd }); if(!up.ok) throw new Error('upload failed'); const { success, url, error } = await up.json(); if(!success) throw new Error(error||'upload failed'); await fetch(`${BACKEND_URL}/send`,{ method:'POST', headers:{ 'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}` }, body: JSON.stringify({ chat_id: chatId, sender: 'user', type: 'image', url }) }); progress.remove(); fileInput.value=''; loadMessages(); }catch(e){ console.error(e); alert('Upload failed'); const p = document.querySelector('.upload-progress'); if(p) p.remove() } });
 
-        if (!uploadResponse.ok) {
-          throw new Error(`Upload failed: ${uploadResponse.status}`);
-        }
+      emojiBtn.addEventListener('click', (e)=>{ e.stopPropagation(); emojiPicker.classList.toggle('show') });
+      document.addEventListener('click', (e)=>{ if(!emojiPicker.contains(e.target) && e.target !== emojiBtn) emojiPicker.classList.remove('show') });
+      document.querySelectorAll('.emoji-btn').forEach(b=> b.addEventListener('click', ()=>{ const emoji = b.dataset.emoji; const pos = msgInput.selectionStart; msgInput.value = msgInput.value.slice(0,pos) + emoji + msgInput.value.slice(pos); msgInput.focus(); msgInput.selectionStart = msgInput.selectionEnd = pos + emoji.length; emojiPicker.classList.remove('show') }));
 
-        const { success, url, error } = await uploadResponse.json();
-        if (!success) {
-          throw new Error(error || "Upload failed");
-        }
+      sendBtn.addEventListener('click', sendMessage);
+      clearBtn.addEventListener('click', ()=>{ if(confirm('Clear all messages?')) chatContainer.innerHTML = '' });
+      msgInput.addEventListener('keypress', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage() } });
 
-        await fetch(`${BACKEND_URL}/send`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${sessionToken}`
-          },
-          body: JSON.stringify({
-            chat_id: chatId,
-            sender: "user",
-            type: "image",
-            url: url
-          })
-        });
+      document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && isLoggedIn){ markOnline(); loadMessages() } });
+      window.addEventListener('beforeunload', ()=>{ if(isLoggedIn && sessionToken){ const data = JSON.stringify({ chat_id: chatId, sender: 'user' }); navigator.sendBeacon(`${BACKEND_URL}/logout_user`, data) } });
 
-        fileInput.value = "";
-        progressDiv.remove();
-        loadMessages();
-      } catch (error) {
-        console.error("Error uploading file:", error);
-        alert("Failed to upload image. Please try again.");
-        const progressDiv = document.querySelector(".upload-progress");
-        if (progressDiv) progressDiv.remove();
-      }
-    });
-
-    // Emoji picker
-    emojiBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      emojiPicker.classList.toggle("show");
-    });
-
-    document.addEventListener("click", (e) => {
-      if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
-        emojiPicker.classList.remove("show");
-      }
-    });
-
-    document.querySelectorAll(".emoji-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const emoji = btn.dataset.emoji;
-        const cursorPos = msgInput.selectionStart;
-        msgInput.value = msgInput.value.slice(0, cursorPos) + emoji + msgInput.value.slice(cursorPos);
-        msgInput.focus();
-        msgInput.selectionStart = msgInput.selectionEnd = cursorPos + emoji.length;
-        emojiPicker.classList.remove("show");
-      });
-    });
-
-    // Other event listeners
-    sendBtn.addEventListener("click", sendMessage);
-    clearBtn.addEventListener("click", () => {
-      if (confirm("Clear all messages?")) {
-        chatContainer.innerHTML = "";
-      }
-    });
-
-    msgInput.addEventListener("keypress", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
-
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible" && isLoggedIn) {
-        markOnline();
-        loadMessages();
-      }
-    });
-
-    // Handle page unload
-    window.addEventListener("beforeunload", () => {
-      if (isLoggedIn && sessionToken) {
-        const data = JSON.stringify({ chat_id: chatId, sender: "user" });
-        navigator.sendBeacon(`${BACKEND_URL}/logout_user`, data);
-      }
-    });
-
-    // Special effects for love messages
-    function spawnLoveBubbles() {
-      for (let i = 0; i < 3; i++) {
-        setTimeout(() => {
-          const bubble = document.createElement("div");
-          bubble.className = "bubble";
-          bubble.textContent = "💖";
-          bubble.style.left = `${20 + Math.random() * 60}%`;
-          document.body.appendChild(bubble);
-          setTimeout(() => bubble.remove(), 3000);
-        }, i * 200);
-      }
-    }
-
-    // Initialize password field to handle enter key
-    document.getElementById("pwd").addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
-        checkPwd();
-      }
-    });
-  </script>
-</body>
+      document.getElementById('pwd').addEventListener('keypress', (e)=>{ if(e.key==='Enter') checkPwd() });
+    </script>
+  </body>
 </html>
