@@ -951,6 +951,49 @@ function spawnSleepBubbles() {
   setTimeout(() => txt.remove(), 4000);
 }
 
+// Unread / notification badge helpers (works for logged-out users using localStorage timestamp)
+function setUnreadBadge(count) {
+  try {
+    if (!unreadBadge) return;
+    if (count && count > 0) {
+      unreadBadge.style.display = 'inline-block';
+      unreadBadge.textContent = count > 99 ? '99+' : String(count);
+      document.title = `(${count}) ${document.title.replace(/^\(\d+\)\s*/, '')}`;
+    } else {
+      unreadBadge.style.display = 'none';
+      document.title = document.title.replace(/^\(\d+\)\s*/, '');
+    }
+  } catch (e) { /* ignore */ }
+}
+
+async function pollPublicCounts() {
+  try {
+    const res = await fetch(`${BACKEND_URL}/messages/${chatId}`);
+    if (!res.ok) return;
+    const msgs = await res.json();
+    if (!Array.isArray(msgs) || msgs.length === 0) { setUnreadBadge(0); return; }
+    const lastSeen = parseInt(localStorage.getItem('regal_last_seen_ts') || '0', 10);
+    const unread = msgs.filter(m => (m.timestamp || 0) > lastSeen).length;
+    setUnreadBadge(unread);
+  } catch (e) { /* ignore */ }
+}
+
+// Mark seen when clicking the badge
+if (unreadBadge) {
+  unreadBadge.addEventListener('click', () => {
+    fetch(`${BACKEND_URL}/messages/${chatId}`).then(r=>r.json()).then(msgs=>{
+      const maxTs = Math.max(0, ...msgs.map(m=>m.timestamp||0));
+      localStorage.setItem('regal_last_seen_ts', String(maxTs));
+      setUnreadBadge(0);
+    }).catch(()=>{});
+  });
+}
+
+// Poll every 5 seconds for public unread counts (works even if not logged in)
+setInterval(pollPublicCounts, 5000);
+// Run once immediately
+pollPublicCounts();
+
 // --- Run the lock check on page load ---
 document.addEventListener('DOMContentLoaded', () => {
     checkSessionLock();
