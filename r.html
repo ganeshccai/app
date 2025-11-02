@@ -610,7 +610,7 @@ async function sendMessage() {
   if (editingMessageId) {
     if (!sessionToken) { alert('Login required to edit messages'); return; }
     try {
-      await fetch(`${BACKEND_URL}/edit_message`, {
+      const res = await fetch(`${BACKEND_URL}/edit_message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -618,30 +618,64 @@ async function sendMessage() {
         },
         body: JSON.stringify({ chat_id: chatId, message_id: editingMessageId, text })
       });
-    } catch (e) { console.error('Edit failed', e); }
+      if (!res.ok) {
+        const textErr = await res.text().catch(()=>'');
+        alert('Edit failed: ' + res.status + ' ' + textErr);
+      }
+    } catch (e) { console.error('Edit failed', e); alert('Edit failed: ' + e.message); }
     editingMessageId = null;
     const editIndicator = document.getElementById('edit-indicator'); if (editIndicator) editIndicator.remove();
   } else {
     // Sending: allow unauthenticated sends (backend may accept public posts).
     const payload = { chat_id: chatId, sender: 'user', text };
     if (replyTo) payload.reply_to = replyTo;
+
+    // Build headers and options, include CORS/credentials to improve compatibility
     const headers = { 'Content-Type': 'application/json' };
     if (sessionToken) headers['Authorization'] = `Bearer ${sessionToken}`;
+
+    // Disable send UI while sending
     try {
+      sendBtn.disabled = true;
+      sendBtn.style.opacity = 0.6;
+
+      // Record debug info about the outgoing request
+      const dbg = document.getElementById('debug-body');
+      if (dbg) dbg.innerHTML += `<br>sending: ${JSON.stringify(payload).slice(0,300)}`;
+
       const res = await fetch(`${BACKEND_URL}/send`, {
         method: 'POST',
+        mode: 'cors',
+        credentials: 'include',
         headers,
         body: JSON.stringify(payload)
       });
-      let info = `status:${res.status}`;
-      try { const json = await res.json(); info += ` body:${JSON.stringify(json).slice(0,200)}`; } catch(e){}
+
+      // Try to read response as text; then attempt to parse JSON for richer info
+      let raw = '';
+      try { raw = await res.text(); } catch (e) { raw = `<<failed to read response: ${e.message}>>`; }
+
+      let parsed = null; try { parsed = JSON.parse(raw); } catch(e) { /* not JSON */ }
+
+      const info = `status:${res.status} ok:${res.ok} body:${(parsed ? JSON.stringify(parsed).slice(0,1000) : raw.slice(0,1000))}`;
       console.log('Send result:', info);
-      // surface to debug panel if present
-      const dbg = document.getElementById('debug-body'); if (dbg) dbg.innerHTML += `<br>lastSend: ${info}`;
-      if (!res.ok) alert('Send failed: ' + res.status);
+      if (dbg) dbg.innerHTML += `<br>lastSend: ${info}`;
+
+      // If server returned 401/403, surface a helpful hint
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          alert('Send rejected: authentication required (status ' + res.status + '). Try logging in.');
+        } else {
+          alert('Send failed: ' + res.status + '. See Debug panel for details.');
+        }
+      }
     } catch (e) {
       console.error('Send failed', e);
-      alert('Failed to send message. See console for details.');
+      const dbg = document.getElementById('debug-body'); if (dbg) dbg.innerHTML += `<br>send-error: ${e.message}`;
+      alert('Failed to send message. See console/debug panel for details.');
+    } finally {
+      sendBtn.disabled = false;
+      sendBtn.style.opacity = 1;
     }
     replyTo = null;
     const r = document.getElementById('reply-indicator'); if (r) r.remove();
@@ -840,26 +874,6 @@ function setEditMessage(messageId, message) {
   const existing = document.getElementById('edit-indicator'); if (existing) existing.remove();
   const ei = document.createElement('div'); ei.id = 'edit-indicator'; ei.className = 'reply-indicator'; ei.textContent = `Editing message`;
   const inputContainer = document.getElementById('input-container'); inputContainer.insertBefore(ei, inputContainer.firstChild);
-}
-
-// Public unread polling for logged-out users
-let publicUnreadInterval = null;
-function startPublicUnreadPoll() {
-  if (publicUnreadInterval) clearInterval(publicUnreadInterval);
-  publicUnreadInterval = setInterval(async () => {
-    if (isLoggedIn) { clearInterval(publicUnreadInterval); publicUnreadInterval = null; unreadBadge.style.display='none'; return; }
-    try {
-      const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=public`);
-      const list = await res.json();
-      const newestTs = list && list.length ? (list[list.length-1].timestamp || list[list.length-1].ts || Date.now()) : 0;
-      const lastSeen = parseInt(localStorage.getItem(UNREAD_KEY) || '0', 10);
-      if (newestTs > lastSeen) {
-        const diff = list.length - (parseInt(localStorage.getItem('regal_last_count')||'0',10));
-        unreadBadge.textContent = diff > 0 ? diff : 1;
-        unreadBadge.style.display = 'inline-block';
-      }
-    } catch (e) { /* ignore */ }
-  }, 3000);
 }
 
 
