@@ -271,7 +271,6 @@
     </div>
 </div>
 <header>𝓡𝓮𝓰𝓪𝓵 <span id="agent-status">🔴</span> <span id="unread-badge" style="display:none;margin-left:10px;background:#ff3b30;color:#fff;padding:4px 8px;border-radius:12px;font-size:12px;">0</span></header>
-<!-- Debug panel removed -->
 <div id="chat-container"></div>
 <div id="input-container">
   <textarea id="msg" rows="2" placeholder="Type message..." autocomplete="off"></textarea>
@@ -420,6 +419,7 @@ const uploadBtn = document.getElementById("upload-btn");
 const fileInput = document.getElementById("file-input");
 const emojiBtn = document.getElementById("emoji-btn");
 const emojiPicker = document.getElementById("emoji-picker");
+const unreadBadge = document.getElementById('unread-badge');
 
 let isLoggedIn = false;
 let sessionToken = null;
@@ -430,41 +430,15 @@ let lastProcessedMessages = [];
 let userNearBottom = true; // if user is near bottom we'll auto-scroll on new messages
 let replyTo = null; // message id being replied to
 let editingMessageId = null; // message id being edited
-const UNREAD_KEY = 'regal_last_seen_ts';
-const unreadBadge = document.getElementById('unread-badge');
 
-// track scroll position so we don't force-scroll when user browses history
-chatContainer.addEventListener('scroll', () => {
-  const distance = chatContainer.scrollHeight - (chatContainer.scrollTop + chatContainer.clientHeight);
-  userNearBottom = distance < 120; // threshold in px
-});
-
-// Reusable options popup element
-const optionsPopup = document.createElement('div');
-optionsPopup.className = 'options-popup';
-optionsPopup.style.display = 'none';
-document.body.appendChild(optionsPopup);
-
-function hideOptionsPopup() {
-  optionsPopup.style.display = 'none';
-}
-
-document.addEventListener('click', (e) => {
-  if (!optionsPopup.contains(e.target)) hideOptionsPopup();
-});
-
-function formatTimestamp(ts) {
-  try {
-    const d = new Date(ts);
-    if (isNaN(d)) return '';
-    const day = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    let hours = d.getHours();
-    const minutes = d.getMinutes().toString().padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12;
-    return `${day} ${hours}:${minutes} ${ampm}`;
-  } catch (e) { return '' }
-}
+// New messages floating button (appears when user scrolled up)
+const newMsgBtn = document.createElement('button');
+newMsgBtn.id = 'new-msg-btn';
+newMsgBtn.textContent = 'New messages';
+Object.assign(newMsgBtn.style, { position: 'fixed', right: '20px', bottom: '90px', zIndex: 1200, display: 'none', background: '#ff5b5b', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '18px', cursor: 'pointer' });
+document.body.appendChild(newMsgBtn);
+let unseenCount = 0;
+newMsgBtn.addEventListener('click', () => { chatContainer.scrollTop = chatContainer.scrollHeight; userNearBottom = true; unseenCount = 0; newMsgBtn.style.display = 'none'; if (unreadBadge) { unreadBadge.style.display='none'; } });
 
 // Emoji picker toggle
 emojiBtn.addEventListener("click", (e) => {
@@ -494,6 +468,26 @@ document.querySelectorAll(".emoji-btn").forEach(btn => {
     sendTyping(msgInput.value);
   });
 });
+
+// track scroll position so we don't force-scroll when user browses history
+chatContainer.addEventListener('scroll', () => {
+  const distance = chatContainer.scrollHeight - (chatContainer.scrollTop + chatContainer.clientHeight);
+  userNearBottom = distance < 120; // threshold in px
+});
+
+// helper: format timestamp (Date without year, 12-hour time)
+function formatTimestamp(ts) {
+  try {
+    const d = new Date(ts * 1000); // backend stores seconds
+    if (isNaN(d)) return '';
+    const day = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    let hours = d.getHours();
+    const minutes = d.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    return `${day} ${hours}:${minutes} ${ampm}`;
+  } catch (e) { return '' }
+}
 
 async function checkPwd() {
   // --- Check lock before logging in ---
@@ -527,9 +521,6 @@ async function checkPwd() {
     sessionToken = data.session_token;
     document.getElementById("login-overlay").style.display = "none";
     isLoggedIn = true;
-    // stop any public unread poll and hide badge
-    if (publicUnreadInterval) { clearInterval(publicUnreadInterval); publicUnreadInterval = null; }
-    if (unreadBadge) unreadBadge.style.display = 'none';
     startPolling();
   } else {
     document.getElementById("login-msg").textContent = data.error || "Login failed";
@@ -591,79 +582,43 @@ function startPolling() {
 }
 
 async function sendMessage() {
-  const text = msgInput.value.trim();
-  if (!text) return;
-
-  // If editing, require login/sessionToken (editing must be authenticated)
-  if (editingMessageId) {
-    if (!sessionToken) { alert('Login required to edit messages'); return; }
-    try {
-      const res = await fetch(`${BACKEND_URL}/edit_message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken}`
-        },
-        body: JSON.stringify({ chat_id: chatId, message_id: editingMessageId, text })
+  // Allow loading for public viewers when not logged in.
+  const wasNearBottom = userNearBottom;
+  const isTabActive = document.visibilityState === 'visible';
+  const viewer = (isLoggedIn && isThisTabActive) ? 'user' : 'public';
+  const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=${viewer}&active=${isTabActive}`);
+  const data = await res.json();
+  // compute IDs for change detection
+  const currentMessageIds = data.map((m, i) => `${m.id||m.message_id||i}-${m.sender}-${(m.text||'').slice(0,40)}`);
+  const newMessages = data.filter((m, i) => {
+    const msgId = `${m.id||m.message_id||i}-${m.sender}-${(m.text||'').slice(0,40)}`;
+    return !lastProcessedMessages.includes(msgId);
+  });
       });
-      if (!res.ok) {
-        const textErr = await res.text().catch(()=>'');
-        alert('Edit failed: ' + res.status + ' ' + textErr);
-      }
+      if (!res.ok) { const err = await res.text().catch(()=>''); alert('Edit failed: ' + res.status + ' ' + err); }
     } catch (e) { console.error('Edit failed', e); alert('Edit failed: ' + e.message); }
     editingMessageId = null;
     const editIndicator = document.getElementById('edit-indicator'); if (editIndicator) editIndicator.remove();
   } else {
-    // Sending: allow unauthenticated sends (backend may accept public posts).
+    // Sending a new message
     const payload = { chat_id: chatId, sender: 'user', text };
-    if (replyTo) payload.reply_to = replyTo;
-
-    // Build headers and options, include CORS/credentials to improve compatibility
-    const headers = { 'Content-Type': 'application/json' };
-    if (sessionToken) headers['Authorization'] = `Bearer ${sessionToken}`;
-
-    // Disable send UI while sending
+    if (replyTo) { payload.reply_to = replyTo; }
     try {
-      sendBtn.disabled = true;
-      sendBtn.style.opacity = 0.6;
-
-      // Record debug info about the outgoing request
-      const dbg = document.getElementById('debug-body');
-      if (dbg) dbg.innerHTML += `<br>sending: ${JSON.stringify(payload).slice(0,300)}`;
-
       const res = await fetch(`${BACKEND_URL}/send`, {
-        method: 'POST',
-        mode: 'cors',
-        credentials: 'include',
-        headers,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${sessionToken}`
+        },
         body: JSON.stringify(payload)
       });
-
-      // Try to read response as text; then attempt to parse JSON for richer info
-      let raw = '';
-      try { raw = await res.text(); } catch (e) { raw = `<<failed to read response: ${e.message}>>`; }
-
-      let parsed = null; try { parsed = JSON.parse(raw); } catch(e) { /* not JSON */ }
-
-      const info = `status:${res.status} ok:${res.ok} body:${(parsed ? JSON.stringify(parsed).slice(0,1000) : raw.slice(0,1000))}`;
-      console.log('Send result:', info);
-      if (dbg) dbg.innerHTML += `<br>lastSend: ${info}`;
-
-      // If server returned 401/403, surface a helpful hint
       if (!res.ok) {
-        if (res.status === 401 || res.status === 403) {
-          alert('Send rejected: authentication required (status ' + res.status + '). Try logging in.');
-        } else {
-          alert('Send failed: ' + res.status + '. See Debug panel for details.');
-        }
+        const err = await res.text().catch(()=>'');
+        alert('Send failed: ' + res.status + ' ' + err);
       }
     } catch (e) {
       console.error('Send failed', e);
-      const dbg = document.getElementById('debug-body'); if (dbg) dbg.innerHTML += `<br>send-error: ${e.message}`;
-      alert('Failed to send message. See console/debug panel for details.');
-    } finally {
-      sendBtn.disabled = false;
-      sendBtn.style.opacity = 1;
+      alert('Failed to send message. See console for details.');
     }
     replyTo = null;
     const r = document.getElementById('reply-indicator'); if (r) r.remove();
@@ -671,25 +626,39 @@ async function sendMessage() {
 
   msgInput.value = '';
   await sendTyping('');
-  // reload messages; if user was near bottom we will autoscroll inside loadMessages
-  loadMessages();
+  // reload messages; autoscroll only if user is near bottom
+  await loadMessages();
 }
 
 async function loadMessages() {
-  // Allow loading for public viewers when not logged in.
-  const wasNearBottom = userNearBottom;
-  const isTabActive = document.visibilityState === 'visible';
-  const viewer = (isLoggedIn && isThisTabActive) ? 'user' : 'public';
-  const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=${viewer}&active=${isTabActive}`);
+  if (!isLoggedIn || !isThisTabActive) return;
+  const isTabActive = document.visibilityState === "visible";
+  const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=user&active=${isTabActive}`);
   const data = await res.json();
+  chatContainer.innerHTML = "";
 
-  // compute IDs for change detection
-  const currentMessageIds = data.map((m, i) => `${m.id||m.message_id||i}-${m.sender}-${(m.text||'').slice(0,40)}`);
+  const currentMessageIds = data.map((m, i) => `${m.sender}-${m.text}-${i}`);
   const newMessages = data.filter((m, i) => {
-    const msgId = `${m.id||m.message_id||i}-${m.sender}-${(m.text||'').slice(0,40)}`;
+    const msgId = `${m.sender}-${m.text}-${i}`;
     return !lastProcessedMessages.includes(msgId);
   });
 
+  const newLoveMessage = newMessages.some(m => m.text && /\blove\b/i.test(m.text));
+  const newGoodnightMessage = newMessages.some(m => 
+    m.text && /\b(goodnight|gn|gnsd|gntc|gnsdtc)\b/i.test(m.text)
+  );
+  
+  if (newLoveMessage) {
+    spawnLoveBubbles();
+  }
+  
+  if (newGoodnightMessage) {
+    spawnSleepBubbles();
+  }
+
+  lastProcessedMessages = currentMessageIds;
+
+  // record new message types for small effects
   const newLoveMessage = newMessages.some(m => m.text && /\blove\b/i.test(m.text));
   const newGoodnightMessage = newMessages.some(m => m.text && /\b(goodnight|gn|gnsd|gntc|gnsdtc)\b/i.test(m.text));
   if (newLoveMessage) spawnLoveBubbles();
@@ -704,6 +673,7 @@ async function loadMessages() {
     const d = document.createElement('div');
     d.className = 'message ' + (m.sender === 'user' ? 'user-msg' : 'agent-msg');
     d.dataset.messageId = id;
+    d.dataset.sender = m.sender;
 
     // main content
     if (m.type === 'image' && m.url) {
@@ -717,24 +687,25 @@ async function loadMessages() {
       d.appendChild(txt);
     }
 
-    // reply preview
+    // reply preview if provided
     if (m.reply_to && m.reply_preview) {
       const rp = document.createElement('div'); rp.className = 'reply-indicator'; rp.textContent = `↩ ${m.reply_preview}`; rp.style.fontSize='13px'; rp.style.opacity='0.9'; d.insertBefore(rp, d.firstChild);
     }
 
     // timestamp
     const ts = m.timestamp || m.ts || m.created_at || m.time;
-    const stamp = document.createElement('div');
-    stamp.style.fontSize = '12px'; stamp.style.color = '#666'; stamp.style.marginTop = '6px';
+    const stamp = document.createElement('div'); stamp.style.fontSize = '12px'; stamp.style.color = '#666'; stamp.style.marginTop = '6px';
     stamp.textContent = ts ? formatTimestamp(ts) : '';
-    if (ts) stamp.title = new Date(ts).toLocaleString();
+    if (ts) stamp.title = new Date(ts*1000).toLocaleString();
     d.appendChild(stamp);
 
-    // reactions
+    // reactions: backend stores lists of user_ids per reaction
     if (m.reactions && typeof m.reactions === 'object') {
       const reactionsRow = document.createElement('div'); reactionsRow.className = 'reactions';
-      Object.entries(m.reactions).forEach(([emoji, count]) => {
+      Object.entries(m.reactions).forEach(([emoji, arr]) => {
+        const count = Array.isArray(arr) ? arr.length : (typeof arr === 'number' ? arr : 0);
         const chip = document.createElement('div'); chip.className = 'reaction'; chip.textContent = `${emoji} ${count}`;
+        chip.style.display='inline-block'; chip.style.margin='4px'; chip.style.padding='4px 8px'; chip.style.borderRadius='12px'; chip.style.background='#fff'; chip.style.cursor='pointer';
         chip.addEventListener('click', (ev) => { ev.stopPropagation(); addReaction(id, emoji); });
         reactionsRow.appendChild(chip);
       });
@@ -748,20 +719,27 @@ async function loadMessages() {
     }
 
     // click handler to open options
-    d.addEventListener('click', (e) => {
-      e.stopPropagation();
-      showMessageOptions(e, m, d);
-    });
+    d.addEventListener('click', (e) => { e.stopPropagation(); showMessageOptions(e, m, d); });
 
     chatContainer.appendChild(d);
   });
 
-  // update message count
   if (data.length > lastMessageCount) lastMessageCount = data.length;
 
-  // scroll only if user was near bottom
+  // If user was near bottom, auto-scroll. Otherwise show 'new messages' indicator
   if (wasNearBottom) {
     chatContainer.scrollTop = chatContainer.scrollHeight;
+    unseenCount = 0;
+    newMsgBtn.style.display = 'none';
+    if (unreadBadge) unreadBadge.style.display = 'none';
+  } else {
+    // show summary badge (increment unseen count)
+    if (newMessages && newMessages.length) {
+      unseenCount += newMessages.length;
+      newMsgBtn.textContent = `New messages (${unseenCount})`;
+      newMsgBtn.style.display = 'block';
+      if (unreadBadge) { unreadBadge.textContent = unseenCount; unreadBadge.style.display = 'inline-block'; }
+    }
   }
 }
 
@@ -784,86 +762,6 @@ async function loadTyping() {
     chatContainer.scrollTop = chatContainer.scrollHeight;
   }
 }
-
-// Show options (Reply / React / Edit / Delete) for a clicked message
-function showMessageOptions(e, message, el) {
-  optionsPopup.innerHTML = '';
-  const msgId = message.id || message.message_id || el.dataset.messageId;
-
-  // Reply button
-  const btnReply = document.createElement('button'); btnReply.textContent = 'Reply';
-  btnReply.addEventListener('click', (ev) => { ev.stopPropagation(); setReplyTo(msgId, message); hideOptionsPopup(); });
-  optionsPopup.appendChild(btnReply);
-
-  // React button - open small palette
-  const btnReact = document.createElement('button'); btnReact.textContent = 'React';
-  btnReact.addEventListener('click', (ev) => {
-    ev.stopPropagation();
-    // show small inline emoji choices
-    const emojis = ['😊','😂','❤️','👍','🔥','😢'];
-    const palette = document.createElement('div'); palette.style.display='flex'; palette.style.gap='6px';
-    emojis.forEach(em => {
-      const b = document.createElement('button'); b.textContent = em; b.style.padding='6px'; b.addEventListener('click', (ev2) => { ev2.stopPropagation(); addReaction(msgId, em); hideOptionsPopup(); });
-      palette.appendChild(b);
-    });
-    optionsPopup.appendChild(palette);
-  });
-  optionsPopup.appendChild(btnReact);
-
-  // If user authored the message, allow Edit/Delete
-  if (message.sender === 'user') {
-    const btnEdit = document.createElement('button'); btnEdit.textContent = 'Edit';
-    btnEdit.addEventListener('click', (ev) => { ev.stopPropagation(); setEditMessage(msgId, message); hideOptionsPopup(); });
-    optionsPopup.appendChild(btnEdit);
-
-    const btnDelete = document.createElement('button'); btnDelete.textContent = 'Delete';
-    btnDelete.addEventListener('click', (ev) => { ev.stopPropagation(); deleteMessage(msgId); hideOptionsPopup(); });
-    optionsPopup.appendChild(btnDelete);
-  }
-
-  // Position popup near element
-  const rect = el.getBoundingClientRect();
-  optionsPopup.style.left = Math.max(8, rect.left + window.scrollX) + 'px';
-  optionsPopup.style.top = Math.max(8, rect.top + window.scrollY - optionsPopup.offsetHeight - 8) + 'px';
-  optionsPopup.style.display = 'flex';
-}
-
-async function addReaction(messageId, emoji) {
-  try {
-    await fetch(`${BACKEND_URL}/react`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-      body: JSON.stringify({ chat_id: chatId, message_id: messageId, emoji })
-    });
-  } catch (e) { console.error('Reaction failed', e); }
-  loadMessages();
-}
-
-async function deleteMessage(messageId) {
-  if (!confirm('Delete this message?')) return;
-  try {
-    await fetch(`${BACKEND_URL}/delete_message`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ chat_id: chatId, message_id: messageId }) });
-  } catch (e) { console.error('Delete failed', e); }
-  loadMessages();
-}
-
-function setReplyTo(messageId, message) {
-  replyTo = messageId;
-  // show reply indicator above input
-  const existing = document.getElementById('reply-indicator'); if (existing) existing.remove();
-  const ri = document.createElement('div'); ri.id = 'reply-indicator'; ri.className = 'reply-indicator'; ri.textContent = `Replying to: ${ (message.text||'').slice(0,80) }`;
-  const inputContainer = document.getElementById('input-container'); inputContainer.insertBefore(ri, inputContainer.firstChild);
-}
-
-function setEditMessage(messageId, message) {
-  editingMessageId = messageId;
-  msgInput.value = message.text || '';
-  msgInput.focus();
-  // show edit indicator
-  const existing = document.getElementById('edit-indicator'); if (existing) existing.remove();
-  const ei = document.createElement('div'); ei.id = 'edit-indicator'; ei.className = 'reply-indicator'; ei.textContent = `Editing message`;
-  const inputContainer = document.getElementById('input-container'); inputContainer.insertBefore(ei, inputContainer.firstChild);
-}
-
 
 async function sendTyping(text) {
   if (!isLoggedIn || !isThisTabActive) return;
@@ -1011,84 +909,7 @@ function spawnSleepBubbles() {
 
 // --- Run the lock check on page load ---
 document.addEventListener('DOMContentLoaded', () => {
-  checkSessionLock();
-  // start public unread poll if still not logged in
-  if (!isLoggedIn) startPublicUnreadPoll();
-    // start debug panel updater
-    try {
-      const dbgBody = document.getElementById('debug-body');
-      const dbgClose = document.getElementById('debug-close');
-      const dbgRefresh = document.getElementById('debug-refresh');
-      const dbgLoad = document.getElementById('debug-load');
-      const dbgUnlock = document.getElementById('debug-unlock');
-
-      function updateDebug() {
-        const lockVal = (() => { try { return localStorage.getItem(LOCK_KEY); } catch(e){return 'err'; }})();
-        dbgBody.innerHTML = `lock=${lockVal ? lockVal : 'null'}<br>isLoggedIn=${isLoggedIn}<br>isThisTabActive=${isThisTabActive}<br>sessionToken=${sessionToken? 'yes':'no'}<br>userNearBottom=${userNearBottom}<br>lastMessageCount=${lastMessageCount}<br>lastProcessed=${lastProcessedMessages.length}<br>publicPoll=${publicUnreadInterval? 'running':'stopped'}<br>href=${location.href}<br>origin=${location.origin}<br>online=${navigator.onLine}`;
-      }
-
-      dbgRefresh.addEventListener('click', updateDebug);
-      dbgLoad.addEventListener('click', () => { loadMessages(); updateDebug(); });
-      dbgUnlock.addEventListener('click', (e) => { forceClearLock(e); setTimeout(updateDebug,500); });
-      // Diagnostic: attempt a direct POST to /send and show detailed result
-      const dbgDiag = document.getElementById('debug-diag');
-      dbgDiag.addEventListener('click', async () => {
-        const out = document.getElementById('debug-body');
-        out.innerHTML += `<br>diag: attempting POST /send`;
-        const payload = { chat_id: chatId, sender: 'user', text: 'DIAG_TEST from client at ' + Date.now() };
-        try {
-          const t0 = performance.now();
-          const res = await fetch(`${BACKEND_URL}/send`, { method: 'POST', mode: 'cors', credentials: 'include', headers: { 'Content-Type':'application/json', 'X-DIAG':'1' }, body: JSON.stringify(payload) });
-          const t1 = performance.now();
-          let body = '';
-          try { body = await res.text(); } catch (e) { body = '<<no body read: '+e.message+'>>'; }
-          out.innerHTML += `<br>diag-result: status=${res.status} ok=${res.ok} time=${Math.round(t1-t0)}ms body=${body.slice(0,1000)}`;
-        } catch (e) {
-          out.innerHTML += `<br>diag-error: ${e.message}`;
-          console.error('Diag send error', e);
-        }
-        updateDebug();
-      });
-
-      // Diagnostic: test POST to httpbin.org to check generic CORS/network
-      const dbgHttpbin = document.getElementById('debug-httpbin');
-      dbgHttpbin.addEventListener('click', async () => {
-        const out = document.getElementById('debug-body');
-        out.innerHTML += `<br>httpbin: attempting POST https://httpbin.org/post`;
-        try {
-          const t0 = performance.now();
-          const res = await fetch('https://httpbin.org/post', { method: 'POST', mode: 'cors', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({test:'hello'}) });
-          const t1 = performance.now();
-          const body = await res.text();
-          out.innerHTML += `<br>httpbin-result: status=${res.status} time=${Math.round(t1-t0)}ms body=${body.slice(0,800)}`;
-        } catch (e) {
-          out.innerHTML += `<br>httpbin-error: ${e.message}`;
-          console.error('httpbin error', e);
-        }
-        updateDebug();
-      });
-
-      // Diagnostic: ping backend root to check basic reachability
-      const dbgPingBtn = document.getElementById('debug-ping');
-      dbgPingBtn.addEventListener('click', async () => {
-        const out = document.getElementById('debug-body');
-        out.innerHTML += `<br>ping: attempting GET ${BACKEND_URL}`;
-        try {
-          const t0 = performance.now();
-          const res = await fetch(BACKEND_URL, { method: 'GET', mode: 'cors', credentials: 'include' });
-          const t1 = performance.now();
-          let body = '';
-          try { body = await res.text(); } catch (e) { body = `<<no body read: ${e.message}>>`; }
-          out.innerHTML += `<br>ping-result: status=${res.status} ok=${res.ok} time=${Math.round(t1-t0)}ms body=${body.slice(0,800)}`;
-        } catch (e) {
-          out.innerHTML += `<br>ping-error: ${e.message}`;
-          console.error('Ping error', e);
-        }
-        updateDebug();
-      });
-      dbgClose.addEventListener('click', () => document.getElementById('debug-panel').style.display='none');
-      setInterval(updateDebug, 2000);
-    } catch (e) { console.warn('Debug init failed', e); }
+    checkSessionLock();
 });
 </script>
 </body>
