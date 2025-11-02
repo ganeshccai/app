@@ -582,6 +582,10 @@ async function loadMessages() {
   const isTabActive = document.visibilityState === "visible";
   const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=user&active=${isTabActive}`);
   const data = await res.json();
+
+  // Determine whether we should auto-scroll: only if user is already near bottom
+  const wasNearBottom = chatContainer.scrollTop + chatContainer.clientHeight >= chatContainer.scrollHeight - 60;
+
   chatContainer.innerHTML = "";
 
   const currentMessageIds = data.map((m, i) => `${m.sender}-${m.text}-${i}`);
@@ -604,6 +608,9 @@ async function loadMessages() {
   }
 
   lastProcessedMessages = currentMessageIds;
+
+  // Track highest timestamp to support unread badge
+  let highestTs = 0;
 
   data.forEach((m, i) => {
     const d = document.createElement("div");
@@ -631,6 +638,82 @@ async function loadMessages() {
       d.innerHTML = (m.text || "").replace(/\n/g, "<br>");
     }
 
+    // TIMESTAMP (show date+time; title shows full locale string)
+    const ts = document.createElement('div');
+    ts.className = 'timestamp';
+    const dt = new Date((m.timestamp || Date.now()) * 1000);
+    ts.textContent = dt.toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    ts.title = dt.toLocaleString();
+
+    // Options container toggled only by timestamp click
+    const options = document.createElement('div');
+    options.className = 'options';
+
+    ts.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.options.show').forEach(o => { if (o !== options) o.classList.remove('show'); });
+      options.classList.toggle('show');
+    });
+
+    // 1) Edit (user only)
+    if (m.sender === 'user') {
+      const editBtn = document.createElement('button'); editBtn.className = 'option-btn'; editBtn.title = 'Edit'; editBtn.textContent = '✏️';
+      editBtn.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        const newText = prompt('Edit message:', m.text);
+        if (newText !== null && newText.trim() !== '' && newText !== m.text) {
+          try {
+            const r = await fetch(`${BACKEND_URL}/edit_message`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ chat_id: chatId, message_id: m.id, text: newText, user_id: 'user' }) });
+            if (r.ok) loadMessages(); else throw new Error('edit failed');
+          } catch (err) { console.error(err); alert('Edit failed'); }
+        }
+        options.classList.remove('show');
+      });
+      options.appendChild(editBtn);
+
+      // 2) Delete
+      const delBtn = document.createElement('button'); delBtn.className = 'option-btn'; delBtn.title = 'Delete'; delBtn.textContent = '🗑️';
+      delBtn.addEventListener('click', (ev) => { ev.stopPropagation(); if (confirm('Delete this message?')) { deleteMessage(m.id); options.classList.remove('show'); } });
+      options.appendChild(delBtn);
+    }
+
+    // 3) Emoji / React
+    const reactBtn = document.createElement('button'); reactBtn.className = 'option-btn'; reactBtn.title = 'React'; reactBtn.textContent = '😊';
+    reactBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const picker = emojiPicker.cloneNode(true); picker.id = '';
+      picker.style.display = 'block'; picker.style.position = 'absolute'; picker.style.bottom = '100%'; picker.style.right = '0';
+      options.appendChild(picker);
+      picker.querySelectorAll('.emoji-btn').forEach(b => { b.addEventListener('click', (e) => { e.stopPropagation(); addReaction(m.id, b.dataset.emoji); picker.remove(); options.classList.remove('show'); }); });
+      document.addEventListener('click', () => { if (picker && picker.remove) picker.remove(); }, { once: true });
+    });
+    options.appendChild(reactBtn);
+
+    // 4) Reply
+    const replyBtn = document.createElement('button'); replyBtn.className = 'option-btn'; replyBtn.title = 'Reply'; replyBtn.textContent = '↩️';
+    replyBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      replyingTo = m.id;
+      msgInput.focus();
+      const existing = document.getElementById('reply-indicator'); if (existing) existing.remove();
+      const replyIndicator = document.createElement('div'); replyIndicator.id = 'reply-indicator'; replyIndicator.style.padding = '8px'; replyIndicator.style.background = '#f0f0f0'; replyIndicator.style.marginBottom = '8px'; replyIndicator.textContent = `Replying to: ${m.text || 'Image'}`;
+      const cancelBtn = document.createElement('button'); cancelBtn.textContent = '❌'; cancelBtn.addEventListener('click', () => { replyingTo = null; replyIndicator.remove(); });
+      replyIndicator.appendChild(cancelBtn);
+      document.getElementById('input-container').insertBefore(replyIndicator, msgInput);
+      options.classList.remove('show');
+    });
+    options.appendChild(replyBtn);
+
+    // Reactions display
+    if (m.reactions && Object.keys(m.reactions).length > 0) {
+      const reactionsDiv = document.createElement('div'); reactionsDiv.className = 'reactions';
+      Object.entries(m.reactions).forEach(([emoji, users]) => { const reaction = document.createElement('div'); reaction.className='reaction'; reaction.textContent = `${emoji} ${users.length}`; reaction.addEventListener('click', () => addReaction(m.id, emoji)); reactionsDiv.appendChild(reaction); });
+      d.appendChild(reactionsDiv);
+    }
+
+    d.appendChild(ts);
+    d.appendChild(options);
+
     const isLast = i === data.length - 1;
     if (m.sender === "user" && m.seen_by === "agent" && isLast) {
       const seenTag = document.createElement("div");
@@ -642,13 +725,25 @@ async function loadMessages() {
     }
 
     chatContainer.appendChild(d);
+
+    if (m.timestamp) highestTs = Math.max(highestTs, m.timestamp);
   });
 
   if (data.length > lastMessageCount) {
     lastMessageCount = data.length;
   }
 
-  chatContainer.scrollTop = chatContainer.scrollHeight;
+  // Auto-scroll only if user was at/near bottom
+  if (wasNearBottom && !userScrolledUp) {
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
+
+  // Update unread badge for non-logged users via localStorage comparison
+  try {
+    const stored = parseInt(localStorage.getItem('regal_last_seen_ts') || '0', 10);
+    const unread = data.filter(m => (m.timestamp || 0) > stored).length;
+    setUnreadBadge(unread);
+  } catch (e) { /* ignore */ }
 }
 
 async function loadTyping() {
@@ -705,6 +800,47 @@ async function clearChat() {
   chatContainer.innerHTML = "";
   lastMessageCount = 0;
   lastProcessedMessages = [];
+}
+
+// Add / edit / delete / react helper functions
+async function addReaction(messageId, emoji) {
+  // requires auth
+  try {
+    const r = await fetch(`${BACKEND_URL}/react`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+      body: JSON.stringify({ chat_id: chatId, message_id: messageId, reaction: emoji, user_id: 'user' })
+    });
+    if (!r.ok) throw new Error('react failed');
+    loadMessages();
+  } catch (e) {
+    console.error('React error', e);
+    alert('Failed to react');
+  }
+}
+
+async function deleteMessage(messageId) {
+  if (!isLoggedIn || !isThisTabActive) return;
+  try {
+    const r = await fetch(`${BACKEND_URL}/delete_message`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ chat_id: chatId, message_id: messageId, user_id: 'user' }) });
+    if (!r.ok) throw new Error('delete failed');
+    loadMessages();
+  } catch (e) {
+    console.error('Delete error', e);
+    alert('Failed to delete');
+  }
+}
+
+async function editMessage(messageId, newText) {
+  if (!isLoggedIn || !isThisTabActive) return;
+  try {
+    const r = await fetch(`${BACKEND_URL}/edit_message`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ chat_id: chatId, message_id: messageId, text: newText, user_id: 'user' }) });
+    if (!r.ok) throw new Error('edit failed');
+    loadMessages();
+  } catch (e) {
+    console.error('Edit message error', e);
+    alert('Failed to edit');
+  }
 }
 
 async function markOnline() {
