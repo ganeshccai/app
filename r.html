@@ -628,11 +628,17 @@ async function sendMessage() {
     const headers = { 'Content-Type': 'application/json' };
     if (sessionToken) headers['Authorization'] = `Bearer ${sessionToken}`;
     try {
-      await fetch(`${BACKEND_URL}/send`, {
+      const res = await fetch(`${BACKEND_URL}/send`, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload)
       });
+      let info = `status:${res.status}`;
+      try { const json = await res.json(); info += ` body:${JSON.stringify(json).slice(0,200)}`; } catch(e){}
+      console.log('Send result:', info);
+      // surface to debug panel if present
+      const dbg = document.getElementById('debug-body'); if (dbg) dbg.innerHTML += `<br>lastSend: ${info}`;
+      if (!res.ok) alert('Send failed: ' + res.status);
     } catch (e) {
       console.error('Send failed', e);
       alert('Failed to send message. See console for details.');
@@ -648,11 +654,11 @@ async function sendMessage() {
 }
 
 async function loadMessages() {
-  // If not active or logged in, do not load (unless you want public loading when logged out)
-  if (!isLoggedIn || !isThisTabActive) return;
+  // Allow loading for public viewers when not logged in.
   const wasNearBottom = userNearBottom;
   const isTabActive = document.visibilityState === 'visible';
-  const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=user&active=${isTabActive}`);
+  const viewer = (isLoggedIn && isThisTabActive) ? 'user' : 'public';
+  const res = await fetch(`${BACKEND_URL}/messages/${chatId}?viewer=${viewer}&active=${isTabActive}`);
   const data = await res.json();
 
   // compute IDs for change detection
