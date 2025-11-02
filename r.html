@@ -712,6 +712,55 @@ async function loadMessages() {
   data.forEach((m, i) => {
     const d = document.createElement("div");
     d.className = "message " + (m.sender === "user" ? "user-msg" : "agent-msg");
+    
+    // If this is a reply message, show the original message above
+    if (m.reply_to) {
+      const originalMsg = data.find(msg => msg.id === m.reply_to);
+      if (originalMsg) {
+        const replyToDiv = document.createElement("div");
+        replyToDiv.className = "reply-to";
+        replyToDiv.style.fontSize = "12px";
+        replyToDiv.style.padding = "4px 8px";
+        replyToDiv.style.background = "rgba(0,0,0,0.05)";
+        replyToDiv.style.borderRadius = "8px";
+        replyToDiv.style.marginBottom = "4px";
+        replyToDiv.style.position = "relative";
+        replyToDiv.style.cursor = "pointer";
+        
+        // Add reply indicator
+        const replyIndicator = document.createElement("div");
+        replyIndicator.style.fontSize = "11px";
+        replyIndicator.style.color = "#666";
+        replyIndicator.style.marginBottom = "2px";
+        replyIndicator.textContent = `↳ Reply to ${originalMsg.sender}:`;
+        replyToDiv.appendChild(replyIndicator);
+        
+        // Add original message preview
+        const preview = document.createElement("div");
+        preview.style.whiteSpace = "nowrap";
+        preview.style.overflow = "hidden";
+        preview.style.textOverflow = "ellipsis";
+        preview.textContent = originalMsg.text || "(image)";
+        replyToDiv.appendChild(preview);
+        
+        // Click to scroll to original message
+        replyToDiv.addEventListener("click", () => {
+          const originalElement = document.querySelector(`[data-message-id="${m.reply_to}"]`);
+          if (originalElement) {
+            originalElement.scrollIntoView({ behavior: "smooth", block: "center" });
+            originalElement.style.backgroundColor = "rgba(255,235,238,0.5)";
+            setTimeout(() => {
+              originalElement.style.backgroundColor = "";
+            }, 2000);
+          }
+        });
+        
+        d.appendChild(replyToDiv);
+      }
+    }
+    
+    // Add message ID for reply linking
+    d.setAttribute("data-message-id", m.id);
 
     if (m.type === "image" && m.url) {
       const img = document.createElement("img");
@@ -792,9 +841,46 @@ async function loadMessages() {
       ev.stopPropagation();
       replyingTo = m.id;
       msgInput.focus();
-      const existing = document.getElementById('reply-indicator'); if (existing) existing.remove();
-      const replyIndicator = document.createElement('div'); replyIndicator.id = 'reply-indicator'; replyIndicator.style.padding = '8px'; replyIndicator.style.background = '#f0f0f0'; replyIndicator.style.marginBottom = '8px'; replyIndicator.textContent = `Replying to: ${m.text || 'Image'}`;
-      const cancelBtn = document.createElement('button'); cancelBtn.textContent = '❌'; cancelBtn.addEventListener('click', () => { replyingTo = null; replyIndicator.remove(); });
+      
+      // Remove existing reply indicator if any
+      const existing = document.getElementById('reply-indicator');
+      if (existing) existing.remove();
+      
+      // Create new reply indicator
+      const replyIndicator = document.createElement('div');
+      replyIndicator.id = 'reply-indicator';
+      replyIndicator.style.padding = '8px';
+      replyIndicator.style.background = '#f0f0f0';
+      replyIndicator.style.marginBottom = '8px';
+      replyIndicator.style.borderRadius = '8px';
+      replyIndicator.style.display = 'flex';
+      replyIndicator.style.alignItems = 'center';
+      replyIndicator.style.gap = '8px';
+      
+      // Add reply icon and sender info
+      const replyInfo = document.createElement('div');
+      replyInfo.style.flex = '1';
+      replyInfo.innerHTML = `<div style="font-size:12px;color:#666;margin-bottom:2px">↳ Replying to ${m.sender}:</div>`;
+      
+      // Add message preview with ellipsis if too long
+      const preview = document.createElement('div');
+      preview.style.whiteSpace = 'nowrap';
+      preview.style.overflow = 'hidden';
+      preview.style.textOverflow = 'ellipsis';
+      preview.textContent = m.text || '(image)';
+      replyInfo.appendChild(preview);
+      
+      // Add cancel button
+      const cancelBtn = document.createElement('button');
+      cancelBtn.style.padding = '4px 8px';
+      cancelBtn.style.fontSize = '12px';
+      cancelBtn.textContent = '❌ Cancel Reply';
+      cancelBtn.addEventListener('click', () => {
+        replyingTo = null;
+        replyIndicator.remove();
+      });
+      
+      replyIndicator.appendChild(replyInfo);
       replyIndicator.appendChild(cancelBtn);
       document.getElementById('input-container').insertBefore(replyIndicator, msgInput);
       options.classList.remove('show');
@@ -803,8 +889,32 @@ async function loadMessages() {
 
     // Reactions display
     if (m.reactions && Object.keys(m.reactions).length > 0) {
-      const reactionsDiv = document.createElement('div'); reactionsDiv.className = 'reactions';
-      Object.entries(m.reactions).forEach(([emoji, users]) => { const reaction = document.createElement('div'); reaction.className='reaction'; reaction.textContent = `${emoji} ${users.length}`; reaction.addEventListener('click', () => addReaction(m.id, emoji)); reactionsDiv.appendChild(reaction); });
+      const reactionsDiv = document.createElement('div');
+      reactionsDiv.className = 'reactions';
+      reactionsDiv.style.display = 'flex';
+      reactionsDiv.style.flexWrap = 'wrap';
+      reactionsDiv.style.gap = '4px';
+      reactionsDiv.style.marginTop = '4px';
+      Object.entries(m.reactions).forEach(([emoji, users]) => {
+        const reaction = document.createElement('div');
+        reaction.className = 'reaction';
+        reaction.style.background = '#f0f0f0';
+        reaction.style.padding = '2px 6px';
+        reaction.style.borderRadius = '12px';
+        reaction.style.cursor = 'pointer';
+        reaction.style.display = 'flex';
+        reaction.style.alignItems = 'center';
+        reaction.style.fontSize = '14px';
+        // Check if current user has reacted
+        const hasReacted = users.includes('user');
+        if (hasReacted) {
+          reaction.style.background = '#ffebee';
+        }
+        reaction.textContent = `${emoji} ${users.length}`;
+        reaction.title = hasReacted ? 'Click to remove reaction' : 'Click to add reaction';
+        reaction.addEventListener('click', () => addReaction(m.id, emoji));
+        reactionsDiv.appendChild(reaction);
+      });
       d.appendChild(reactionsDiv);
     }
 
