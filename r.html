@@ -102,11 +102,13 @@
       right: -40px;
       top: 50%;
       transform: translateY(-50%);
-      display: none;
+      display: none;  /* Hidden by default */
       background: white;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.15);
       z-index: 10;
+      opacity: 0;
+      transition: opacity 0.2s ease-in-out;
     }
     
     .message .options.show {
@@ -114,6 +116,12 @@
       flex-direction: column;
       gap: 4px;
       padding: 4px;
+      opacity: 1;
+    }
+    
+    /* Hide other open options when clicking elsewhere */
+    .message:not(:hover) .options:not(.show) {
+      display: none;
     }
     
     .option-btn {
@@ -539,12 +547,34 @@
           const options = document.createElement("div");
           options.className = "options";
 
+          // Close all message options when clicking anywhere in the document
+          document.addEventListener('click', (e) => {
+            if (!e.target.closest('.message')) {
+              document.querySelectorAll('.options.show').forEach(opt => {
+                opt.classList.remove('show');
+              });
+            }
+          });
+
+          // Handle message click
           msgDiv.onclick = (e) => {
             e.stopPropagation();
-            document.querySelectorAll('.options.show').forEach(opt => {
-              if (opt !== options) opt.classList.remove('show');
+            const allOptions = document.querySelectorAll('.options.show');
+            const thisOptionsShown = options.classList.contains('show');
+            
+            // First hide all other open options
+            allOptions.forEach(opt => {
+              if (opt !== options) {
+                opt.classList.remove('show');
+              }
             });
-            options.classList.toggle('show');
+            
+            // Then toggle this message's options
+            if (!thisOptionsShown) {
+              options.classList.add('show');
+            } else {
+              options.classList.remove('show');
+            }
           };
 
           // Reply button
